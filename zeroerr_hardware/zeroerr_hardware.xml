@@ -1,0 +1,10 @@
+<library path="zeroerr_hardware">
+  <class name="zeroerr_hardware/ArmHardwareInterface"
+    type="zeroerr_hardware::ArmHardwareInterface"
+    base_class_type="hardware_interface::SystemInterface"
+  >
+    <description>
+      Hardware interface for aroArm
+    </description>
+  </class>
+</library>
