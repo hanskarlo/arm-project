@@ -22,10 +22,10 @@ ament_export_include_directories(
   ${ETHERLAB_DIR}/include
 )
 
-add_library(
-  ${PROJECT_NAME}
-  SHARED
-  src/zeroerr_interface.cpp)
+# add_library(
+#   ${PROJECT_NAME}
+#   SHARED
+#   src/zeroerr_interface.cpp)
 
 add_executable(zeroerr_interface src/zeroerr_interface.cpp)
 target_include_directories(
@@ -46,7 +46,7 @@ ament_target_dependencies(
 # INSTALL
 install(
   TARGETS ${PROJECT_NAME}
-  DESTINATION lib
+  DESTINATION lib/${PROJECT_NAME}
 )
 install(
   DIRECTORY include/
