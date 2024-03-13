@@ -1,5 +1,5 @@
 #include <ecrt.h>
-    
+
 #define NUM_JOINTS 6
 
 #define EROB_70H100_MAX_SPEED   262144 // counts/s
@@ -28,8 +28,9 @@
 #define DIGI_INPUT_INDEX    0x60FD, 0
 #define STATUS_WORD_INDEX   0x6041, 0  
 
-
 // Other objects in dictionary (index, subindex)
+#define SM2_SYNC_TYPE           0x1C32, 1
+#define SM3_SYNC_TYPE           0x1C33, 1
 #define ERROR_CODE              0x603F, 0
 #define MAX_PROFILE_VELOCITY    0x607F, 0
 #define MAX_VELOCITY            0x6080, 0
@@ -42,6 +43,7 @@
 #define MODE_OF_OPERATION       0x6060, 0
 
 
+//* Ethercat variables
 // EtherCAT
 ec_master_t *master = NULL;
 ec_master_state_t master_state = {};
@@ -49,9 +51,10 @@ ec_domain_t *domain = NULL;
 ec_domain_state_t domain_state = {};
 ec_slave_config_t *erob_config = NULL;
 ec_slave_config_state_t erob_state = {};
+ec_slave_config_t *joint_slave_configs[NUM_JOINTS];
+ec_slave_config_state_t joint_ec_states[NUM_JOINTS];
+static ec_sdo_request_t *sdo[NUM_JOINTS];
 
-
-//* Ethercat variables
 unsigned long counter;
 
 // CiA 402 PDS FSA States
@@ -72,9 +75,8 @@ DriveState driveState[NUM_JOINTS] = {DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT
 static uint8_t *domain_pd;
 
 // RxPDO entry offsets
-static unsigned int target_pos_offset;
-static unsigned int d_out_offset;
-static unsigned int ctrl_word_offset;
+static unsigned int target_pos_offset[NUM_JOINTS];
+static unsigned int ctrl_word_offset[NUM_JOINTS];
 
 // TxPDO entry offsets
 static unsigned int actual_pos_offset[NUM_JOINTS];
@@ -105,8 +107,9 @@ const static ec_pdo_entry_reg_t domain_regs_[] = {
     {JOINT6_ALIAS_POS, ZEROERR_EROB, STATUS_WORD_INDEX, &status_word_offset[5], NULL},
     {JOINT6_ALIAS_POS, ZEROERR_EROB, TARGET_POS_INDEX,  &target_pos_offset[5], NULL},
     {JOINT6_ALIAS_POS, ZEROERR_EROB, CTRL_WORD_INDEX,   &ctrl_word_offset[5], NULL},
-    {} //! Terminate with emptry struct
+    {} //! Terminate with empty struct
 };
+
 
 ec_pdo_entry_info_t erob_pdo_entries_[] = {
     {TARGET_POS_INDEX, 32},

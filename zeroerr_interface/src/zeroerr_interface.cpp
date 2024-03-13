@@ -84,7 +84,7 @@ bool ZeroErrInterface::configure_pdos_()
 }
 
 
-bool ZeroErrInterface::set_drive_parameters()
+bool ZeroErrInterface::set_drive_parameters_()
 {
     uint32_t abort_code;
     size_t result_size;
@@ -94,6 +94,63 @@ bool ZeroErrInterface::set_drive_parameters()
 
     for (uint i = 0; i < NUM_JOINTS; i++)
     {
+        //* Set SM2/SM3 synchronization type to DC Mode Sync0
+        // SM2 synchronization type
+        data_16 = 0x0002;
+        if (ecrt_master_sdo_download(
+                master,
+                i,
+                SM2_SYNC_TYPE,
+                (uint8_t *)&data_16,
+                sizeof(data_16),
+                &abort_code))
+        {
+            RCLCPP_ERROR(this->get_logger(), "Failed to download SM2 sync type for j%d", i);
+            return false;
+        }
+
+        if (ecrt_master_sdo_upload(
+                master,
+                i,
+                SM2_SYNC_TYPE,
+                (uint8_t *)&data_16,
+                sizeof(data_16),
+                &result_size,
+                &abort_code))
+        {
+            RCLCPP_ERROR(this->get_logger(), "Failed to upload SM2 sync type for j%d", i);
+            return false;
+        }
+        RCLCPP_INFO(this->get_logger(), "Changed SM2 sync type: 0x%x for j%i", data_16, i);
+
+        // SM3 synchronization type
+        data_16 = 0x0002;
+        if (ecrt_master_sdo_download(
+                master,
+                i,
+                SM3_SYNC_TYPE,
+                (uint8_t *)&data_16,
+                sizeof(data_16),
+                &abort_code))
+        {
+            RCLCPP_ERROR(this->get_logger(), "Failed to download SM3 sync type for j%d", i);
+            return false;
+        }
+
+        if (ecrt_master_sdo_upload(
+                master,
+                i,
+                SM3_SYNC_TYPE,
+                (uint8_t *)&data_16,
+                sizeof(data_16),
+                &result_size,
+                &abort_code))
+        {
+            RCLCPP_ERROR(this->get_logger(), "Failed to upload SM3 sync type for j%d", i);
+            return false;
+        }
+        RCLCPP_INFO(this->get_logger(), "Changed SM3 sync type: 0x%x for j%i", data_16, i);
+
         // Set max velocity
         data_32 = (i < 3) ? EROB_110H120_MAX_SPEED : EROB_70H100_MAX_SPEED;
         if (ecrt_master_sdo_download(
@@ -433,7 +490,7 @@ bool ZeroErrInterface::init_()
         ecrt_sdo_request_timeout(sdo[i], 500); // ms
     }
 
-    ret = set_drive_parameters();
+    ret = set_drive_parameters_();
     if (!ret)
         return ret;
 

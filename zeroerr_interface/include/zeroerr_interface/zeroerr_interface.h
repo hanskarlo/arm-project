@@ -36,7 +36,7 @@ class ZeroErrInterface : public rclcpp::Node
         
         void read_sdos(int joint_no);
         bool configure_pdos_();
-        bool set_drive_parameters();
+        bool set_drive_parameters_();
         bool init_();
 
         void state_transition_(int joint_no);
