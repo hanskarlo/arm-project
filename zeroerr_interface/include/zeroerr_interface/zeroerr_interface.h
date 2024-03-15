@@ -9,13 +9,14 @@
 
 
 #define PI          3.1415926538979323846
+#define TWO_PI      (2 * PI)
 #define MAX_COUNT   524288
 
 // Macro converting eRob encoder counts to radians
-#define COUNT_TO_RAD(x) ((x * (2 * PI)) / MAX_COUNT)
+#define COUNT_TO_RAD(x) ((x * TWO_PI) / MAX_COUNT)
 
 // Macro converting radians to eRob encoder count
-#define RAD_TO_COUNT(x) ((x * MAX_COUNT) / (2 * PI))
+#define RAD_TO_COUNT(x) ((x * MAX_COUNT) / TWO_PI)
 
 
 using namespace std::chrono_literals;
@@ -39,7 +40,8 @@ class ZeroErrInterface : public rclcpp::Node
         bool joints_op_enabled_ = false;
 
         sensor_msgs::msg::JointState joint_states_;
-        std::vector<uint32_t> joint_commands_;
+        std::vector<int32_t> joint_states_enc_counts_;
+        std::vector<int32_t> joint_commands_;
 
         rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr arm_state_pub_;
         rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr arm_cmd_sub_;
@@ -47,7 +49,7 @@ class ZeroErrInterface : public rclcpp::Node
         rclcpp::TimerBase::SharedPtr cyclic_pdo_timer_;
         rclcpp::TimerBase::SharedPtr joint_state_pub_timer_;
         
-        
+
         bool configure_pdos_();
         bool set_drive_parameters_();
         bool init_();
@@ -60,7 +62,9 @@ class ZeroErrInterface : public rclcpp::Node
         bool check_slave_config_states_();
         void check_domain_state_();
         
+        double convert_count_to_rad_(int32_t counts);
         void joint_state_pub_();
+
         void arm_cmd_cb_(sensor_msgs::msg::JointState::UniquePtr arm_cmd);
 
 };

@@ -87,8 +87,8 @@ namespace zeroerr_hardware
     {
         std::vector<hardware_interface::StateInterface> state_interfaces;
 
-        for (uint i = 0; i < arm_position_state_.size(); i++)
-            arm_position_state_[i] = 0.0;
+        // for (uint i = 0; i < arm_position_state_.size(); i++)
+        //     arm_position_state_[i] = 0.0;
 
         //* Link arm_position_state_ to state interface
         for (uint i = 0; i < info_.joints.size(); i++)
@@ -99,7 +99,7 @@ namespace zeroerr_hardware
                     hardware_interface::StateInterface(
                         info_.joints[i].name,
                         info_.joints[i].state_interfaces[j].name,
-                        &arm_position_state_[j]
+                        &arm_position_state_[i]
                     )
                 );
             }
@@ -124,7 +124,7 @@ namespace zeroerr_hardware
                     hardware_interface::CommandInterface(
                         info_.joints[i].name,                           // ith joint name
                         info_.joints[i].command_interfaces[j].name,     // jth command interface name of ith joint    
-                        &arm_position_commands_[j]                          
+                        &arm_position_commands_[i]                      // ith joint command    
                     )
                 );
             }

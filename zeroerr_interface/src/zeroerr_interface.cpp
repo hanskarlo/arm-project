@@ -5,7 +5,15 @@ ZeroErrInterface::ZeroErrInterface() : Node("zeroerr_interface")
 {
     // Initialize vector variables (avoid segfault)
     joint_states_.name.resize(NUM_JOINTS);
+    for (uint i = 0; i < NUM_JOINTS; i++)
+    {
+        std::string joint_name = "j";
+        joint_name.append(std::to_string(i + 1));
+
+        joint_states_.name[i] = joint_name;
+    }
     joint_states_.position.assign(NUM_JOINTS, 0.0);
+    joint_states_enc_counts_.assign(NUM_JOINTS, 0.0);
     joint_commands_.assign(NUM_JOINTS, 0.0);
 
     arm_state_pub_ = this->create_publisher<sensor_msgs::msg::JointState>("arm/state", 10);
@@ -44,6 +52,62 @@ ZeroErrInterface::~ZeroErrInterface()
 
 
 /**
+ * @brief Configures PDOs and joint parameters, activates EtherCAT master and 
+ * allocates process data domain memory.
+ * 
+ * @return true successful initialization,
+ * @return false if initialization failed
+ */
+bool ZeroErrInterface::init_()
+{
+    RCLCPP_INFO(this->get_logger(), "Starting...\n");
+
+
+    master = ecrt_request_master(0);
+    if (!master)
+    {
+        RCLCPP_ERROR(this->get_logger(), "Requesting master 0 failed.\n");
+        return false;
+    }
+
+
+    if (!configure_pdos_()) return false;
+
+
+    // RCLCPP_INFO(this->get_logger(), "Creating SDO requests...\n");
+    // for (uint i = 0; i < NUM_JOINTS; i++)
+    // {
+    //     if (!(sdo[i] = ecrt_slave_config_create_sdo_request(joint_slave_configs[i], 0x603F, 0, sizeof(uint16_t)))) {
+    //         RCLCPP_ERROR(this->get_logger(), "Failed to create SDO request.\n");
+    //         return false;
+    //     }
+    //     ecrt_sdo_request_timeout(sdo[i], 500); // ms
+    // }
+
+
+    if (!set_drive_parameters_()) return false;
+
+
+    RCLCPP_INFO(this->get_logger(), "Activating master...\n");
+    if (ecrt_master_activate(master))
+    {
+        RCLCPP_ERROR(this->get_logger(), "Failed to activate master!\n");
+        return false;
+    }
+
+
+    if (!(domain_pd = ecrt_domain_data(domain)))
+    {
+        RCLCPP_ERROR(this->get_logger(), "Failed to get domain process data!\n");
+        return false;
+    }
+
+
+    return true;
+}
+
+
+/**
  * @brief Configures joints' process data objects (PDOs) and creates 
  * process data domain (see ec_defines.h for domain layout)
  * 
@@ -59,9 +123,12 @@ bool ZeroErrInterface::configure_pdos_()
         return false;
     }
 
+    
+
     RCLCPP_INFO(this->get_logger(), "Configuring PDOs...\n");
     for (uint i = 0; i < NUM_JOINTS; i++)
     {
+        
         if (!(joint_slave_configs[i] = ecrt_master_slave_config(
                   master,
                   0, i,
@@ -71,10 +138,12 @@ bool ZeroErrInterface::configure_pdos_()
             return false;
         }
 
+
         if (ecrt_slave_config_pdos(joint_slave_configs[i], EC_END, erob_syncs_))
         {
             RCLCPP_ERROR(this->get_logger(), "Failed to configure PDOs for joint %d.\n", i);
             return false;
+
         }
     }
     RCLCPP_INFO(this->get_logger(), "Configured PDOs!\n");
@@ -102,70 +171,13 @@ bool ZeroErrInterface::set_drive_parameters_()
     uint32_t abort_code;
     size_t result_size;
     uint32_t data_32;
-    uint16_t data_16;
+    // uint16_t data_16;
     uint8_t data_8;
 
     for (uint i = 0; i < NUM_JOINTS; i++)
     {
-        //* Set SM2/SM3 synchronization type to DC Mode Sync0
-        // SM2 synchronization type
-        data_16 = 0x0002;
-        if (ecrt_master_sdo_download(
-                master,
-                i,
-                SM2_SYNC_TYPE,
-                (uint8_t *)&data_16,
-                sizeof(data_16),
-                &abort_code))
-        {
-            RCLCPP_ERROR(this->get_logger(), "Failed to download SM2 sync type for j%d", i);
-            return false;
-        }
-
-        if (ecrt_master_sdo_upload(
-                master,
-                i,
-                SM2_SYNC_TYPE,
-                (uint8_t *)&data_16,
-                sizeof(data_16),
-                &result_size,
-                &abort_code))
-        {
-            RCLCPP_ERROR(this->get_logger(), "Failed to upload SM2 sync type for j%d", i);
-            return false;
-        }
-        RCLCPP_INFO(this->get_logger(), "Changed SM2 sync type: 0x%x for j%i", data_16, i);
-
-        // SM3 synchronization type
-        data_16 = 0x0002;
-        if (ecrt_master_sdo_download(
-                master,
-                i,
-                SM3_SYNC_TYPE,
-                (uint8_t *)&data_16,
-                sizeof(data_16),
-                &abort_code))
-        {
-            RCLCPP_ERROR(this->get_logger(), "Failed to download SM3 sync type for j%d", i);
-            return false;
-        }
-
-        if (ecrt_master_sdo_upload(
-                master,
-                i,
-                SM3_SYNC_TYPE,
-                (uint8_t *)&data_16,
-                sizeof(data_16),
-                &result_size,
-                &abort_code))
-        {
-            RCLCPP_ERROR(this->get_logger(), "Failed to upload SM3 sync type for j%d", i);
-            return false;
-        }
-        RCLCPP_INFO(this->get_logger(), "Changed SM3 sync type: 0x%x for j%i", data_16, i);
-
         // Set max velocity
-        data_32 = (i < 3) ? EROB_110H120_MAX_SPEED : EROB_70H100_MAX_SPEED;
+        data_32 = (i < 3) ? EROB_110H120_MAX_SPEED - 1000 : EROB_70H100_MAX_SPEED - 1000;
         if (ecrt_master_sdo_download(
                 master,
                 i,
@@ -174,7 +186,7 @@ bool ZeroErrInterface::set_drive_parameters_()
                 sizeof(data_32),
                 &abort_code))
         {
-            RCLCPP_ERROR(this->get_logger(), "Failed to download Max profile velocity for j%d", i);
+            RCLCPP_ERROR(this->get_logger(), "Failed to download Max velocity for j%d", i);
             return false;
         }
 
@@ -187,10 +199,10 @@ bool ZeroErrInterface::set_drive_parameters_()
                 &result_size,
                 &abort_code))
         {
-            RCLCPP_ERROR(this->get_logger(), "Failed to upload Max profile velocity for j%d", i);
+            RCLCPP_ERROR(this->get_logger(), "Failed to upload Max velocity for j%d", i);
             return false;
         }
-        RCLCPP_INFO(this->get_logger(), "Changed max profile velocity: %u counts/s for j%i", data_32, i);
+        RCLCPP_INFO(this->get_logger(), "Changed max velocity: %u counts/s for j%i", data_32, i);
 
 
         // Set max profile velocity
@@ -368,7 +380,7 @@ bool ZeroErrInterface::set_drive_parameters_()
         
 
         // Position following window
-        data_32 = 100000;
+        data_32 = 10000;
         if (ecrt_master_sdo_download(
                 master,
                 i,
@@ -475,62 +487,6 @@ bool ZeroErrInterface::set_drive_parameters_()
 
 
 /**
- * @brief Configures PDOs and joint parameters, activates EtherCAT master and 
- * allocates process data domain memory.
- * 
- * @return true successful initialization,
- * @return false if initialization failed
- */
-bool ZeroErrInterface::init_()
-{
-    RCLCPP_INFO(this->get_logger(), "Starting...\n");
-
-
-    master = ecrt_request_master(0);
-    if (!master)
-    {
-        RCLCPP_ERROR(this->get_logger(), "Requesting master 0 failed.\n");
-        return false;
-    }
-
-
-    if (!configure_pdos_()) return false;
-
-
-    // RCLCPP_INFO(this->get_logger(), "Creating SDO requests...\n");
-    // for (uint i = 0; i < NUM_JOINTS; i++)
-    // {
-    //     if (!(sdo[i] = ecrt_slave_config_create_sdo_request(joint_slave_configs[i], 0x603F, 0, sizeof(uint16_t)))) {
-    //         RCLCPP_ERROR(this->get_logger(), "Failed to create SDO request.\n");
-    //         return false;
-    //     }
-    //     ecrt_sdo_request_timeout(sdo[i], 500); // ms
-    // }
-
-
-    if (!set_drive_parameters_()) return false;
-
-
-    RCLCPP_INFO(this->get_logger(), "Activating master...\n");
-    if (ecrt_master_activate(master))
-    {
-        RCLCPP_ERROR(this->get_logger(), "Failed to activate master!\n");
-        return false;
-    }
-
-
-    if (!(domain_pd = ecrt_domain_data(domain)))
-    {
-        RCLCPP_ERROR(this->get_logger(), "Failed to get domain process data!\n");
-        return false;
-    }
-
-
-    return true;
-}
-
-
-/**
  * @brief Transitions joints through CiA402 Drive Profile State Machine.
  * 
  * @return true if all joints reached Operation Enabled state,
@@ -588,14 +544,14 @@ bool ZeroErrInterface::state_transition_()
     }
     else if ((status_word & 0b01101111) == 0b00100111)
     {
-        if (driveState[joint_no_] != OPERATION_ENABLED)
-        {
+        // if (driveState[joint_no_] != OPERATION_ENABLED)
+        // {
             driveState[joint_no_] = OPERATION_ENABLED;
             RCLCPP_INFO(this->get_logger(), " J%d State: Operation enabled!", joint_no_);
             
             //* Current joint reached Operation Enabled, enable next joint
             joint_no_++;
-        }
+        // }
     }
     else if ((status_word & 0b01101111) == 0b00000111)
     {
@@ -621,7 +577,10 @@ bool ZeroErrInterface::state_transition_()
     }
 
     if (joint_no_ == NUM_JOINTS) // All joints reached Operation Enabled
+    {
+        joint_no_ = 0;
         return true;
+    }
     else
         return false;
 }
@@ -673,7 +632,7 @@ void ZeroErrInterface::cyclic_pdo_loop_()
 
     // Read joint states
     for (uint i = 0; i < NUM_JOINTS; i++)
-        joint_states_.position[i] = COUNT_TO_RAD( EC_READ_U32(domain_pd + actual_pos_offset[i]) );
+        joint_states_enc_counts_[i] = EC_READ_S32(domain_pd + actual_pos_offset[i]);
 
 
     if (counter_)
@@ -704,32 +663,20 @@ void ZeroErrInterface::cyclic_pdo_loop_()
     {
         // Transit joints through CiA402 PDS FSA
         joints_op_enabled_ = state_transition_();
-
-        //* Check all motors are in Operation Enabled state (PDS FSA)
-        // uint8_t op_en_counter = 0;
-        // for (uint i = 0; i < NUM_JOINTS; i++)
-        // {
-        //     if (driveState[i] == OPERATION_ENABLED)
-        //         op_en_counter++;
-        // }
-
-        // if (state_counter == NUM_JOINTS)
-        // {
-        //     for (uint i = 0; i < NUM_JOINTS; i++)
-        //     {
-        //         EC_WRITE_U32(domain_pd + target_pos_offset[i], joint_commands_[i]);
-        //     }
-        // }
     }        
     else
     {
         joints_OP_ = check_slave_config_states_();
 
-        //* If not all joints reached OP state for 5s, retry
-        if ((this->now().seconds() - stamp_) >= 5)
+        //* If not all joints reached OP state for 4s, retry
+        if ((this->now().seconds() - stamp_) >= 4)
         {
             RCLCPP_INFO(this->get_logger(), "Not all joints reached OP, retrying");
             ecrt_master_reset(master);
+
+            // receive process data
+            ecrt_master_receive(master);
+            ecrt_domain_process(domain);
 
             stamp_ = this->now().seconds();
         }
@@ -739,21 +686,35 @@ void ZeroErrInterface::cyclic_pdo_loop_()
     // If all joints reached CiA402 Drive State Operation Enabled
     if (joints_op_enabled_)
     {
+        RCLCPP_INFO(this->get_logger(), "Writing target pos %u", joint_commands_[5]);
         for (uint i = 0; i < NUM_JOINTS; i++)
         {
-            EC_WRITE_U32(domain_pd + target_pos_offset[i], joint_commands_[i]);
+            EC_WRITE_S32(domain_pd + target_pos_offset[i], joint_commands_[i]);
         }
     }
-    else
-    {
 
-    }
 
     // send process data
     ecrt_domain_queue(domain);
     ecrt_master_send(master);
 }
 
+double ZeroErrInterface::convert_count_to_rad_(int32_t counts)
+{
+    double radians;
+
+    if ( (counts > 0) ? (counts > MAX_COUNT) : (abs(counts) > MAX_COUNT))
+    {
+        double scaled_counts = (counts > 0) ? (MAX_COUNT - (counts % MAX_COUNT)) : -(MAX_COUNT - (abs(counts) % MAX_COUNT));
+        radians = COUNT_TO_RAD(scaled_counts);
+    }
+    else
+    {
+        radians = COUNT_TO_RAD(counts);
+    }
+
+    return radians;
+}
 
 /**
  * @brief Joint state publisher callback.
@@ -767,13 +728,8 @@ void ZeroErrInterface::joint_state_pub_()
 
     for (uint i = 0; i < NUM_JOINTS; i++)
     {
-        std::string joint_name = "j";
-        joint_name.append(std::to_string(i + 1));
-
-        joint_states_.name[i] = joint_name;
+        joint_states_.position[i] = convert_count_to_rad_(joint_states_enc_counts_[i]);
     }
-
-
 
     arm_state_pub_->publish(joint_states_);
 }
@@ -867,6 +823,8 @@ bool ZeroErrInterface::check_slave_config_states_()
  */
 void ZeroErrInterface::arm_cmd_cb_(sensor_msgs::msg::JointState::UniquePtr arm_cmd)
 {
+    // RCLCPP_INFO(this->get_logger(), "arm_cmd_cb fired");
+
     for (uint i = 0; i < arm_cmd->position.size(); i++) {
         joint_commands_[i] = RAD_TO_COUNT( arm_cmd->position[i] );
     }

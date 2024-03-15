@@ -54,6 +54,12 @@ def generate_launch_description():
         arguments=["--ros-args", "--log-level", "info"],
     )
 
+    arm_interface = Node(
+        package="zeroerr_interface",
+        executable="zeroerr_interface",
+        output="screen",
+    )
+
     # RViz
     rviz_config = os.path.join(
         get_package_share_directory("zeroerr_config"),
