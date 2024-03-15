@@ -1,29 +1,42 @@
 #include <chrono>
 #include <string>
+// #include <thread>
+// #include <mutex>
+#include "ec_defines.h"
 
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/sensor_msgs/msg/joint_state.hpp"
 
-#include "ec_defines.h"
+
+#define PI          3.1415926538979323846
+#define MAX_COUNT   524288
+
+// Macro converting eRob encoder counts to radians
+#define COUNT_TO_RAD(x) ((x * (2 * PI)) / MAX_COUNT)
+
+// Macro converting radians to eRob encoder count
+#define RAD_TO_COUNT(x) ((x * MAX_COUNT) / (2 * PI))
+
 
 using namespace std::chrono_literals;
-
-
 
 
 class ZeroErrInterface : public rclcpp::Node
 {
     public:
-
         ZeroErrInterface();
         ~ZeroErrInterface();
 
 
     private:
-        int joint_no_ = 0;
-        double stamp = 0;
-        bool operational = false;
+        const std::chrono::milliseconds CYCLIC_DATA_PERIOD = 1ms;
+        const std::chrono::milliseconds JOINT_STATE_PERIOD = 10ms;
 
+        int joint_no_ = 0;
+        unsigned long counter_ = 0;
+        double stamp_ = 0;
+        bool joints_OP_ = false;
+        bool joints_op_enabled_ = false;
 
         sensor_msgs::msg::JointState joint_states_;
         std::vector<uint32_t> joint_commands_;
@@ -34,24 +47,20 @@ class ZeroErrInterface : public rclcpp::Node
         rclcpp::TimerBase::SharedPtr cyclic_pdo_timer_;
         rclcpp::TimerBase::SharedPtr joint_state_pub_timer_;
         
-        void read_sdos(int joint_no);
+        
         bool configure_pdos_();
         bool set_drive_parameters_();
         bool init_();
 
-        void state_transition_(int joint_no);
+        bool state_transition_();
         void cyclic_pdo_loop_();
 
+        void read_sdos(int joint_no);
+        void check_master_state_();
+        bool check_slave_config_states_();
+        void check_domain_state_();
+        
         void joint_state_pub_();
-
-        void check_master_state();
-        bool check_slave_config_states(int joint_no);
-        void check_domain_state();
-        
         void arm_cmd_cb_(sensor_msgs::msg::JointState::UniquePtr arm_cmd);
-        
-
-
-
 
 };

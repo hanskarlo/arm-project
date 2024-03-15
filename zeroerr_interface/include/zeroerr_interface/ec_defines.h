@@ -82,6 +82,14 @@ static unsigned int ctrl_word_offset[NUM_JOINTS];
 static unsigned int actual_pos_offset[NUM_JOINTS];
 static unsigned int status_word_offset[NUM_JOINTS];
 
+
+/**
+ * @brief Process data domain registry containing the following objects from every joint:
+ *  actual position, target position, status word, and control word.
+ * 
+ * @note Omits digital I/O objects from Rx/TxPDOs.
+ * 
+ */
 const static ec_pdo_entry_reg_t domain_regs_[] = {
     {JOINT1_ALIAS_POS, ZEROERR_EROB, POS_ACTUAL_INDEX,  &actual_pos_offset[0], NULL},
     {JOINT1_ALIAS_POS, ZEROERR_EROB, STATUS_WORD_INDEX, &status_word_offset[0], NULL},

@@ -1,5 +1,6 @@
 #include "zeroerr_interface/zeroerr_interface.h"
 
+
 ZeroErrInterface::ZeroErrInterface() : Node("zeroerr_interface")
 {
     // Initialize vector variables (avoid segfault)
@@ -21,29 +22,34 @@ ZeroErrInterface::ZeroErrInterface() : Node("zeroerr_interface")
     }
     RCLCPP_INFO(this->get_logger(), "Initialization successful!\n");
 
-    stamp = this->now().seconds();
+    stamp_ = this->now().seconds();
 
     // Create cyclic data exchange timer
     cyclic_pdo_timer_ = this->create_wall_timer(
-        1ms,
+        CYCLIC_DATA_PERIOD,
         std::bind(&ZeroErrInterface::cyclic_pdo_loop_, this));
         
-    counter = 0;
-
     // Create joint state publisher timer
     joint_state_pub_timer_ = this->create_wall_timer(
-        10ms,
+        JOINT_STATE_PERIOD,
         std::bind(&ZeroErrInterface::joint_state_pub_, this));
 }
 
 
 ZeroErrInterface::~ZeroErrInterface()
 {
-    RCLCPP_INFO(this->get_logger(), "Releasing master..\n");
+    RCLCPP_INFO(this->get_logger(), "Releasing master...\n");
     ecrt_release_master(master);
 }
 
 
+/**
+ * @brief Configures joints' process data objects (PDOs) and creates 
+ * process data domain (see ec_defines.h for domain layout)
+ * 
+ * @return true for successful configuration,
+ * @return false for failed configuration
+ */
 bool ZeroErrInterface::configure_pdos_()
 {
     RCLCPP_INFO(this->get_logger(), "Registering domain...\n");
@@ -84,6 +90,13 @@ bool ZeroErrInterface::configure_pdos_()
 }
 
 
+/**
+ * @brief Sets drive motion profile and sync manager (SM) parameters for all joints
+ * sequentially.
+ * 
+ * @return true for successful parameter changes,
+ * @return false if any parameter change fails
+ */
 bool ZeroErrInterface::set_drive_parameters_()
 {
     uint32_t abort_code;
@@ -461,10 +474,15 @@ bool ZeroErrInterface::set_drive_parameters_()
 }
 
 
+/**
+ * @brief Configures PDOs and joint parameters, activates EtherCAT master and 
+ * allocates process data domain memory.
+ * 
+ * @return true successful initialization,
+ * @return false if initialization failed
+ */
 bool ZeroErrInterface::init_()
 {
-    bool ret = false;
-
     RCLCPP_INFO(this->get_logger(), "Starting...\n");
 
 
@@ -476,23 +494,21 @@ bool ZeroErrInterface::init_()
     }
 
 
-    ret = configure_pdos_();
-    if (!ret)
-        return ret;
+    if (!configure_pdos_()) return false;
 
-    RCLCPP_INFO(this->get_logger(), "Creating SDO requests...\n");
-    for (uint i = 0; i < NUM_JOINTS; i++)
-    {
-        if (!(sdo[i] = ecrt_slave_config_create_sdo_request(joint_slave_configs[i], 0x603F, 0, sizeof(uint16_t)))) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to create SDO request.\n");
-            return false;
-        }
-        ecrt_sdo_request_timeout(sdo[i], 500); // ms
-    }
 
-    ret = set_drive_parameters_();
-    if (!ret)
-        return ret;
+    // RCLCPP_INFO(this->get_logger(), "Creating SDO requests...\n");
+    // for (uint i = 0; i < NUM_JOINTS; i++)
+    // {
+    //     if (!(sdo[i] = ecrt_slave_config_create_sdo_request(joint_slave_configs[i], 0x603F, 0, sizeof(uint16_t)))) {
+    //         RCLCPP_ERROR(this->get_logger(), "Failed to create SDO request.\n");
+    //         return false;
+    //     }
+    //     ecrt_sdo_request_timeout(sdo[i], 500); // ms
+    // }
+
+
+    if (!set_drive_parameters_()) return false;
 
 
     RCLCPP_INFO(this->get_logger(), "Activating master...\n");
@@ -502,109 +518,150 @@ bool ZeroErrInterface::init_()
         return false;
     }
 
+
     if (!(domain_pd = ecrt_domain_data(domain)))
     {
         RCLCPP_ERROR(this->get_logger(), "Failed to get domain process data!\n");
         return false;
     }
 
+
     return true;
 }
 
 
-void ZeroErrInterface::state_transition_(int joint_no)
+/**
+ * @brief Transitions joints through CiA402 Drive Profile State Machine.
+ * 
+ * @return true if all joints reached Operation Enabled state,
+ * @return false if still in progress, or failed
+ */
+bool ZeroErrInterface::state_transition_()
 {
     uint16_t status_word;
     uint16_t control_word;
     
+
     // Read status + control words
-    status_word = EC_READ_U16(domain_pd + status_word_offset[joint_no]);
-    control_word = EC_READ_U16(domain_pd + ctrl_word_offset[joint_no]);
+    status_word = EC_READ_U16(domain_pd + status_word_offset[joint_no_]);
+    control_word = EC_READ_U16(domain_pd + ctrl_word_offset[joint_no_]);
 
 
     //* CiA 402 PDS FSA commissioning
     if ((status_word & 0b01001111) == 0b00000000)
     {
-        if (driveState[joint_no] != NOT_READY)
+        if (driveState[joint_no_] != NOT_READY)
         {
-            driveState[joint_no] = NOT_READY;
-            RCLCPP_INFO(this->get_logger(), " J%d State: Not ready", joint_no);
+            driveState[joint_no_] = NOT_READY;
+            RCLCPP_INFO(this->get_logger(), " J%d State: Not ready", joint_no_);
         }
     }
     else if ((status_word & 0b01001111) == 0b01000000)
     {
-        EC_WRITE_U16(domain_pd + ctrl_word_offset[joint_no], (control_word & 0b01111110) | 0b00000110);
-        driveState[joint_no] = SWITCH_ON_DISABLED;
-        RCLCPP_INFO(this->get_logger(), " J%d State: Switch on disabled", joint_no);
+        EC_WRITE_U16(domain_pd + ctrl_word_offset[joint_no_], (control_word & 0b01111110) | 0b00000110);
+        
+        if (driveState[joint_no_] != SWITCH_ON_DISABLED)
+        {
+            driveState[joint_no_] = SWITCH_ON_DISABLED;
+            RCLCPP_INFO(this->get_logger(), " J%d State: Switch on disabled", joint_no_);
+        }
     }
     else if ((status_word & 0b01101111) == 0b00100001)
     {
-        EC_WRITE_U16(domain_pd + ctrl_word_offset[joint_no], (control_word & 0b01110111) | 0b00000111);
-        driveState[joint_no] = READY;
-        RCLCPP_INFO(this->get_logger(), " J%d State: Ready to switch on", joint_no);
+        EC_WRITE_U16(domain_pd + ctrl_word_offset[joint_no_], (control_word & 0b01110111) | 0b00000111);
+        
+        if (driveState[joint_no_] != READY)
+        {
+            driveState[joint_no_] = READY;
+            RCLCPP_INFO(this->get_logger(), " J%d State: Ready to switch on", joint_no_);
+        }
     }
     else if ((status_word & 0b01101111) == 0b00100011)
     {
-        EC_WRITE_U16(domain_pd + ctrl_word_offset[joint_no], (control_word & 0b01111111) | 0b00001111);
-        driveState[joint_no] = SWITCHED_ON;
-        RCLCPP_INFO(this->get_logger(), " J%d State: Switched on", joint_no);
+        EC_WRITE_U16(domain_pd + ctrl_word_offset[joint_no_], (control_word & 0b01111111) | 0b00001111);
+
+        if (driveState[joint_no_] != SWITCHED_ON)
+        {
+            driveState[joint_no_] = SWITCHED_ON;
+            RCLCPP_INFO(this->get_logger(), " J%d State: Switched on", joint_no_);
+        }
     }
     else if ((status_word & 0b01101111) == 0b00100111)
     {
-        if (driveState[joint_no] != OPERATION_ENABLED)
+        if (driveState[joint_no_] != OPERATION_ENABLED)
         {
-            driveState[joint_no] = OPERATION_ENABLED;
-            RCLCPP_INFO(this->get_logger(), " J%d State: Operation enabled!", joint_no);
+            driveState[joint_no_] = OPERATION_ENABLED;
+            RCLCPP_INFO(this->get_logger(), " J%d State: Operation enabled!", joint_no_);
+            
+            //* Current joint reached Operation Enabled, enable next joint
             joint_no_++;
         }
     }
     else if ((status_word & 0b01101111) == 0b00000111)
     {
-        EC_WRITE_U16(domain_pd + ctrl_word_offset[joint_no], (control_word & 0b01111111) | 0b00001111);
-        driveState[joint_no] = QUICK_STOP_ACTIVE;
-        RCLCPP_INFO(this->get_logger(), " J%d State: Quick stop active", joint_no);
+        EC_WRITE_U16(domain_pd + ctrl_word_offset[joint_no_], (control_word & 0b01111111) | 0b00001111);
+        driveState[joint_no_] = QUICK_STOP_ACTIVE;
+        RCLCPP_INFO(this->get_logger(), " J%d State: Quick stop active", joint_no_);
     }
     else if ((status_word & 0b01001111) == 0b00001111)
     {
-        EC_WRITE_U16(domain_pd + ctrl_word_offset[joint_no], 0x0080);
-        driveState[joint_no] = FAULT_REACTION_ACTIVE;
-        RCLCPP_INFO(this->get_logger(), " J%d State: Fault reaction active", joint_no);
+        EC_WRITE_U16(domain_pd + ctrl_word_offset[joint_no_], 0x0080);
+        driveState[joint_no_] = FAULT_REACTION_ACTIVE;
+        RCLCPP_INFO(this->get_logger(), " J%d State: Fault reaction active", joint_no_);
     }
     else if ((status_word & 0b01001111) == 0b00001000)
     {
-        EC_WRITE_U16(domain_pd + ctrl_word_offset[joint_no], (control_word & 0b11111111) | 0b10000000);
+        EC_WRITE_U16(domain_pd + ctrl_word_offset[joint_no_], (control_word & 0b11111111) | 0b10000000);
 
-        if (driveState[joint_no] != FAULT)
+        if (driveState[joint_no_] != FAULT)
         {
-            driveState[joint_no] = FAULT;
-            RCLCPP_INFO(this->get_logger(), " J%d State: Fault", joint_no);
+            driveState[joint_no_] = FAULT;
+            RCLCPP_INFO(this->get_logger(), " J%d State: Fault", joint_no_);
         }
     }
 
-
+    if (joint_no_ == NUM_JOINTS) // All joints reached Operation Enabled
+        return true;
+    else
+        return false;
 }
 
-void ZeroErrInterface::read_sdos(int joint_no)
+
+/**
+ * @brief Read selected SDO from selected joint.
+ * 
+ * @param joint_no_ Joint to read SDO from
+ */
+void ZeroErrInterface::read_sdos(int joint_no_)
 {
-    switch (ecrt_sdo_request_state(sdo[joint_no])) {
+    switch (ecrt_sdo_request_state(sdo[joint_no_])) {
         case EC_REQUEST_UNUSED: // request was not used yet
-            ecrt_sdo_request_read(sdo[joint_no]); // trigger first read
+            ecrt_sdo_request_read(sdo[joint_no_]); // trigger first read
             break;
         case EC_REQUEST_BUSY:
             RCLCPP_INFO(this->get_logger(), "Still busy...\n");
             break;
         case EC_REQUEST_SUCCESS:
             RCLCPP_INFO(this->get_logger(), "Error (0x603F): 0x%04X\n",
-                    EC_READ_U16(ecrt_sdo_request_data(sdo[joint_no])));
-            ecrt_sdo_request_read(sdo[joint_no]); // trigger next read
+                    EC_READ_U16(ecrt_sdo_request_data(sdo[joint_no_])));
+            ecrt_sdo_request_read(sdo[joint_no_]); // trigger next read
             break;
         case EC_REQUEST_ERROR:
             RCLCPP_INFO(this->get_logger(), "Failed to read SDO!\n");
-            ecrt_sdo_request_read(sdo[joint_no]); // retry reading
+            ecrt_sdo_request_read(sdo[joint_no_]); // retry reading
             break;
     }
 }
 
+
+/**
+ * @brief Cyclic process data object exchange loop.
+ * 
+ * @note Frequency is controlled through CYCLIC_DATA_PERIOD member. Try not to change.
+ * 
+ * @warning Maintain consistent data exchange timing to avoid EtherCAT sync issues.
+ * 
+ */
 void ZeroErrInterface::cyclic_pdo_loop_()
 {
     // receive process data
@@ -612,49 +669,48 @@ void ZeroErrInterface::cyclic_pdo_loop_()
     ecrt_domain_process(domain);
 
     // check process data state (optional)
-    check_domain_state();
+    // check_domain_state_();
 
     // Read joint states
     for (uint i = 0; i < NUM_JOINTS; i++)
-        joint_states_.position[i] = EC_READ_U32(domain_pd + actual_pos_offset[i]);
+        joint_states_.position[i] = COUNT_TO_RAD( EC_READ_U32(domain_pd + actual_pos_offset[i]) );
 
 
-    if (counter)
+    if (counter_)
     {
-        counter--;
+        counter_--;
     }
-    else
-    { // do this at 1 Hz
-        counter = 1000;
+    else    // Do below every 1s
+    {
+        counter_ = ( 1 / CYCLIC_DATA_PERIOD.count() );
 
         // check for master state (optional)
         // check_master_state();
 
         // check for islave configuration state(s) (optional)
-        if (!operational)
-            operational = check_slave_config_states(joint_no_);
-
-        // status_word[i] = EC_READ_U16(domain_pd + status_word[i]_offset);
-        // RCLCPP_INFO(this->get_logger(), "Status Word: 0x%x", status_word[i]);
+        // if (!operational_)
+            // operational_ = check_slave_config_states_(joint_no__);
+        
 
         // RCLCPP_INFO(this->get_logger(), "Hi");
 
         // read process data SDO
-        // read_sdos(joint_no_);
+        // read_sdos(joint_no__);
     }
 
 
-    if (operational)
+    // If all joints reached EtherCAT OP state
+    if (joints_OP_)
     {
-        // CiA402 PDS FSA
-        state_transition_(joint_no_);
+        // Transit joints through CiA402 PDS FSA
+        joints_op_enabled_ = state_transition_();
 
         //* Check all motors are in Operation Enabled state (PDS FSA)
-        // uint8_t state_counter = 0;
+        // uint8_t op_en_counter = 0;
         // for (uint i = 0; i < NUM_JOINTS; i++)
         // {
         //     if (driveState[i] == OPERATION_ENABLED)
-        //         state_counter++;
+        //         op_en_counter++;
         // }
 
         // if (state_counter == NUM_JOINTS)
@@ -667,12 +723,30 @@ void ZeroErrInterface::cyclic_pdo_loop_()
     }        
     else
     {
-        if ((this->now().seconds() - stamp) >= 5)
+        joints_OP_ = check_slave_config_states_();
+
+        //* If not all joints reached OP state for 5s, retry
+        if ((this->now().seconds() - stamp_) >= 5)
         {
-            RCLCPP_INFO(this->get_logger(), "Resetting master");
+            RCLCPP_INFO(this->get_logger(), "Not all joints reached OP, retrying");
             ecrt_master_reset(master);
-            stamp = this->now().seconds();
+
+            stamp_ = this->now().seconds();
         }
+    }
+
+
+    // If all joints reached CiA402 Drive State Operation Enabled
+    if (joints_op_enabled_)
+    {
+        for (uint i = 0; i < NUM_JOINTS; i++)
+        {
+            EC_WRITE_U32(domain_pd + target_pos_offset[i], joint_commands_[i]);
+        }
+    }
+    else
+    {
+
     }
 
     // send process data
@@ -680,6 +754,13 @@ void ZeroErrInterface::cyclic_pdo_loop_()
     ecrt_master_send(master);
 }
 
+
+/**
+ * @brief Joint state publisher callback.
+ * 
+ * @note Frequency is controlled through JOINT_STATE_PERIOD member.
+ * 
+ */
 void ZeroErrInterface::joint_state_pub_()
 {
     joint_states_.header.stamp = this->now();
@@ -692,10 +773,17 @@ void ZeroErrInterface::joint_state_pub_()
         joint_states_.name[i] = joint_name;
     }
 
+
+
     arm_state_pub_->publish(joint_states_);
 }
 
-void ZeroErrInterface::check_master_state()
+
+/**
+ * @brief Outputs state of EtherCAT master.
+ * 
+ */
+void ZeroErrInterface::check_master_state_()
 {
     ec_master_state_t ms;
 
@@ -711,7 +799,12 @@ void ZeroErrInterface::check_master_state()
     master_state = ms;
 }
 
-void ZeroErrInterface::check_domain_state()
+
+/**
+ * @brief Outputs process data domain state.
+ * 
+ */
+void ZeroErrInterface::check_domain_state_()
 {
     ec_domain_state_t ds;
 
@@ -725,41 +818,57 @@ void ZeroErrInterface::check_domain_state()
     domain_state = ds;
 }
 
-bool ZeroErrInterface::check_slave_config_states(int joint_no)
+
+/**
+ * @brief Check the EtherCAT slave state of each joint sequentially.
+ * 
+ * @return true when all joints reach OP state,
+ * @return false when joints havent reached OP state yet
+ */
+bool ZeroErrInterface::check_slave_config_states_()
 {
     ec_slave_config_state_t s;
 
-    ecrt_slave_config_state(joint_slave_configs[joint_no], &s);
+    ecrt_slave_config_state(joint_slave_configs[joint_no_], &s);
     
-    if (s.al_state != joint_ec_states[joint_no].al_state)
-        RCLCPP_INFO(this->get_logger(), "J%d: State 0x%02X.\n", joint_no, s.al_state);
-    if (s.online != joint_ec_states[joint_no].online)
-        RCLCPP_INFO(this->get_logger(), "J%d: %s.\n", joint_no, s.online ? "online" : "offline");
-    if (s.operational != joint_ec_states[joint_no].operational)
-        RCLCPP_INFO(this->get_logger(), "J%d: %soperational.\n", joint_no, 
+    // if (s.al_state != joint_ec_states[joint_no_].al_state)
+    //     RCLCPP_INFO(this->get_logger(), "J%d: State 0x%02X.\n", joint_no_, s.al_state);
+    // if (s.online != joint_ec_states[joint_no_].online)
+    //     RCLCPP_INFO(this->get_logger(), "J%d: %s.\n", joint_no_, s.online ? "online" : "offline");
+    if (s.operational != joint_ec_states[joint_no_].operational)
+        RCLCPP_INFO(this->get_logger(), "J%d: %soperational.", joint_no_, 
             s.operational ? "" : "Not ");    
 
-    joint_ec_states[joint_no] = s;
+    joint_ec_states[joint_no_] = s;
 
 
-    if (joint_ec_states[joint_no].operational)
+    // Current joint is operational -- check next joint
+    if (joint_ec_states[joint_no_].operational)
         joint_no_++; 
+
 
     if (joint_no_ == 6) // All joints operational
     {
+        // Reset joint tracker
         joint_no_ = 0;
         return true;
     }
     else
+    {
         return false;
+    }
 }
 
+
+/**
+ * @brief Updates joint commands via arm command topic.
+ * 
+ * @param arm_cmd arm command JointState message 
+ */
 void ZeroErrInterface::arm_cmd_cb_(sensor_msgs::msg::JointState::UniquePtr arm_cmd)
 {
-    for (uint i = 0; i < arm_cmd->position.size(); i++)
-    {
-        // Radians -> encoder counts
-        joint_commands_[i] = (arm_cmd->position[i] * 524288) / (2 * 3.14159265);
+    for (uint i = 0; i < arm_cmd->position.size(); i++) {
+        joint_commands_[i] = RAD_TO_COUNT( arm_cmd->position[i] );
     }
 }
 
