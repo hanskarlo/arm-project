@@ -1,5 +1,16 @@
 #include <ecrt.h>
 
+#include <sys/resource.h>
+#include <sys/mman.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <sched.h>
+#include <signal.h>
+#include <time.h>
+#include <string.h>
+
 #define NUM_JOINTS 6
 
 #define EROB_70H100_MAX_SPEED   262144 // counts/s
@@ -17,6 +28,9 @@
 
 // Vendor ID, Product ID
 #define ZEROERR_EROB    0x5a65726f, 0x00029252
+
+// Assign activate code from config xml
+#define ASSIGN_ACTIVATE 0x0300
 
 // RxPDO object index, subindex
 #define TARGET_POS_INDEX    0x607A, 0
@@ -41,6 +55,7 @@
 #define PROFILE_DECELERATION    0x6084, 0
 #define POS_FOLLOW_WINDOW       0x6065, 0
 #define MODE_OF_OPERATION       0x6060, 0
+#define MODE_OF_OPERATION_DISP  0x6061, 0
 
 
 //* Ethercat variables
@@ -55,7 +70,14 @@ ec_slave_config_t *joint_slave_configs[NUM_JOINTS];
 ec_slave_config_state_t joint_ec_states[NUM_JOINTS];
 static ec_sdo_request_t *sdo[NUM_JOINTS];
 
-unsigned long counter;
+
+#define CLOCK_TO_USE CLOCK_MONOTONIC
+#define FREQUENCY 1000
+#define NSEC_PER_SEC (1000000000L)
+#define PERIOD_NS (NSEC_PER_SEC / FREQUENCY)
+#define TIMESPEC2NS(T) ((uint64_t) (T).tv_sec * NSEC_PER_SEC + (T).tv_nsec)
+struct timespec time_ns;
+
 
 // CiA 402 PDS FSA States
 typedef enum{
@@ -81,7 +103,6 @@ static unsigned int ctrl_word_offset[NUM_JOINTS];
 // TxPDO entry offsets
 static unsigned int actual_pos_offset[NUM_JOINTS];
 static unsigned int status_word_offset[NUM_JOINTS];
-
 
 /**
  * @brief Process data domain registry containing the following objects from every joint:

@@ -85,7 +85,7 @@ bool ZeroErrInterface::init_()
     // }
 
 
-    if (!set_drive_parameters_()) return false;
+    // if (!set_drive_parameters_()) return false;
 
 
     RCLCPP_INFO(this->get_logger(), "Activating master...\n");
@@ -176,35 +176,6 @@ bool ZeroErrInterface::set_drive_parameters_()
 
     for (uint i = 0; i < NUM_JOINTS; i++)
     {
-        // Set max velocity
-        data_32 = (i < 3) ? EROB_110H120_MAX_SPEED - 1000 : EROB_70H100_MAX_SPEED - 1000;
-        if (ecrt_master_sdo_download(
-                master,
-                i,
-                MAX_VELOCITY,
-                (uint8_t *)&data_32,
-                sizeof(data_32),
-                &abort_code))
-        {
-            RCLCPP_ERROR(this->get_logger(), "Failed to download Max velocity for j%d", i);
-            return false;
-        }
-
-        if (ecrt_master_sdo_upload(
-                master,
-                i,
-                MAX_VELOCITY,
-                (uint8_t *)&data_32,
-                sizeof(data_32),
-                &result_size,
-                &abort_code))
-        {
-            RCLCPP_ERROR(this->get_logger(), "Failed to upload Max velocity for j%d", i);
-            return false;
-        }
-        RCLCPP_INFO(this->get_logger(), "Changed max velocity: %u counts/s for j%i", data_32, i);
-
-
         // Set max profile velocity
         data_32 = (i < 3) ? EROB_110H120_MAX_SPEED : EROB_70H100_MAX_SPEED;
         if (ecrt_master_sdo_download(
@@ -234,66 +205,8 @@ bool ZeroErrInterface::set_drive_parameters_()
         RCLCPP_INFO(this->get_logger(), "Changed max profile velocity: %u counts/s for j%i", data_32, i);
 
 
-        // Max acceleration
-        data_32 = (i < 3) ? EROB_110H120_MAX_ADCEL : EROB_70H100_MAX_ADCEL;
-        if (ecrt_master_sdo_download(
-                master,
-                i,
-                MAX_ACCELERATION,
-                (uint8_t *)&data_32,
-                sizeof(data_32),
-                &abort_code))
-        {
-            RCLCPP_ERROR(this->get_logger(), "Failed to change Max acceleration for j%d", i);
-            return false;
-        }
-
-        if (ecrt_master_sdo_upload(
-                master,
-                i,
-                MAX_ACCELERATION,
-                (uint8_t *)&data_32,
-                sizeof(data_32),
-                &result_size,
-                &abort_code))
-        {
-            RCLCPP_ERROR(this->get_logger(), "Failed to change Max acceleration for j%d", i);
-            return false;
-        }
-        RCLCPP_INFO(this->get_logger(), "Changed max acceleration: %u for j%d", data_32, i);
-
-
-        // Max deceleration
-        data_32 = (i < 3) ? EROB_110H120_MAX_ADCEL : EROB_70H100_MAX_ADCEL;
-        if (ecrt_master_sdo_download(
-                master,
-                i,
-                MAX_DECELERATION,
-                (uint8_t *)&data_32,
-                sizeof(data_32),
-                &abort_code))
-        {
-            RCLCPP_ERROR(this->get_logger(), "Failed to download Max deceleration for j%d", i);
-            return false;
-        }
-
-        if (ecrt_master_sdo_upload(
-                master,
-                i,
-                MAX_DECELERATION,
-                (uint8_t *)&data_32,
-                sizeof(data_32),
-                &result_size,
-                &abort_code))
-        {
-            RCLCPP_ERROR(this->get_logger(), "Failed to upload Max deceleration for j%d", i);
-            return false;
-        }
-        RCLCPP_INFO(this->get_logger(), "Changed max deceleration: %u for j%d", data_32, i);
-
-
         // Profile velocity
-        data_32 = (i < 3) ? (EROB_110H120_MAX_SPEED / 2) : (EROB_70H100_MAX_SPEED / 2);
+        data_32 = (i < 3) ? (EROB_110H120_MAX_SPEED / 10) : (EROB_70H100_MAX_SPEED / 10);
         if (ecrt_master_sdo_download(
                 master,
                 i,
@@ -322,7 +235,7 @@ bool ZeroErrInterface::set_drive_parameters_()
 
 
         // Profile acceleration
-        data_32 = (i < 3) ? (EROB_110H120_MAX_ADCEL / 2) : (EROB_70H100_MAX_ADCEL / 2);
+        data_32 = (i < 3) ? (EROB_110H120_MAX_ADCEL / 10) : (EROB_70H100_MAX_ADCEL / 10);
         if (ecrt_master_sdo_download(
                 master,
                 i,
@@ -351,7 +264,7 @@ bool ZeroErrInterface::set_drive_parameters_()
 
 
         // Profile deceleration
-        data_32 = (i < 3) ? (EROB_110H120_MAX_ADCEL / 2) : (EROB_70H100_MAX_ADCEL / 2);
+        data_32 = (i < 3) ? (EROB_110H120_MAX_ADCEL / 10) : (EROB_70H100_MAX_ADCEL / 10);
         if (ecrt_master_sdo_download(
                 master,
                 i,
@@ -479,6 +392,15 @@ bool ZeroErrInterface::set_drive_parameters_()
             return false;
         }
         RCLCPP_INFO(this->get_logger(), "Target position: %u (counts) for j%d\n\n", data_32, i);
+    
+
+        // Setup DC-Synchronization 
+        ecrt_slave_config_dc(
+            joint_slave_configs[i], 
+            ASSIGN_ACTIVATE, 
+            PERIOD_NS, 
+            4400000, 0, 0);
+    
     }
 
 
@@ -509,7 +431,7 @@ bool ZeroErrInterface::state_transition_()
         if (driveState[joint_no_] != NOT_READY)
         {
             driveState[joint_no_] = NOT_READY;
-            RCLCPP_INFO(this->get_logger(), " J%d State: Not ready", joint_no_);
+            // RCLCPP_INFO(this->get_logger(), " J%d State: Not ready", joint_no_);
         }
     }
     else if ((status_word & 0b01001111) == 0b01000000)
@@ -519,7 +441,7 @@ bool ZeroErrInterface::state_transition_()
         if (driveState[joint_no_] != SWITCH_ON_DISABLED)
         {
             driveState[joint_no_] = SWITCH_ON_DISABLED;
-            RCLCPP_INFO(this->get_logger(), " J%d State: Switch on disabled", joint_no_);
+            // RCLCPP_INFO(this->get_logger(), " J%d State: Switch on disabled", joint_no_);
         }
     }
     else if ((status_word & 0b01101111) == 0b00100001)
@@ -529,7 +451,7 @@ bool ZeroErrInterface::state_transition_()
         if (driveState[joint_no_] != READY)
         {
             driveState[joint_no_] = READY;
-            RCLCPP_INFO(this->get_logger(), " J%d State: Ready to switch on", joint_no_);
+            // RCLCPP_INFO(this->get_logger(), " J%d State: Ready to switch on", joint_no_);
         }
     }
     else if ((status_word & 0b01101111) == 0b00100011)
@@ -539,19 +461,19 @@ bool ZeroErrInterface::state_transition_()
         if (driveState[joint_no_] != SWITCHED_ON)
         {
             driveState[joint_no_] = SWITCHED_ON;
-            RCLCPP_INFO(this->get_logger(), " J%d State: Switched on", joint_no_);
+            // RCLCPP_INFO(this->get_logger(), " J%d State: Switched on", joint_no_);
         }
     }
     else if ((status_word & 0b01101111) == 0b00100111)
     {
-        // if (driveState[joint_no_] != OPERATION_ENABLED)
-        // {
+        if (driveState[joint_no_] != OPERATION_ENABLED)
+        {
             driveState[joint_no_] = OPERATION_ENABLED;
             RCLCPP_INFO(this->get_logger(), " J%d State: Operation enabled!", joint_no_);
             
             //* Current joint reached Operation Enabled, enable next joint
-            joint_no_++;
-        // }
+        }
+        joint_no_++;    
     }
     else if ((status_word & 0b01101111) == 0b00000111)
     {
@@ -692,6 +614,14 @@ void ZeroErrInterface::cyclic_pdo_loop_()
             EC_WRITE_S32(domain_pd + target_pos_offset[i], joint_commands_[i]);
         }
     }
+
+
+
+    // Sync every cycle
+    clock_gettime(CLOCK_TO_USE, &time_ns);
+    ecrt_master_sync_reference_clock_to(master, TIMESPEC2NS(time_ns));
+    ecrt_master_sync_slave_clocks(master);
+
 
 
     // send process data

@@ -43,6 +43,11 @@ colcon build
 ```
 
 ## Usage
+Start the EtherCAT Master module:
+```
+sudo /etc/init.d/ethercat start
+```
+
 Run the zeroerr_interface node:
 ```bash
 ros2 run zeroerr_interface zeroerr_interface

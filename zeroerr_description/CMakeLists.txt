@@ -13,7 +13,7 @@ find_package(ament_cmake REQUIRED)
 # find_package(<dependency> REQUIRED)
 
 install(
-  DIRECTORY launch config urdf meshes textures rviz
+  DIRECTORY launch config urdf meshes rviz
   DESTINATION share/${PROJECT_NAME}
 )
 
