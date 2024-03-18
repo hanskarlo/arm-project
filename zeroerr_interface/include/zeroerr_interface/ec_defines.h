@@ -19,6 +19,12 @@
 #define EROB_110H120_MAX_SPEED  145927 // counts/s
 #define EROB_110H120_MAX_ADCEL  486423 // counts/s^2
 
+// #define EROB_70H100_MAX_SPEED   262144/10 // counts/s
+// #define EROB_70H100_MAX_ADCEL   873813/10 // counts/s^2
+
+// #define EROB_110H120_MAX_SPEED  145927/10 // counts/s
+// #define EROB_110H120_MAX_ADCEL  486423/10 // counts/s^2
+
 #define JOINT1_ALIAS_POS  0, 0
 #define JOINT2_ALIAS_POS  0, 1
 #define JOINT3_ALIAS_POS  0, 2
@@ -29,7 +35,7 @@
 // Vendor ID, Product ID
 #define ZEROERR_EROB    0x5a65726f, 0x00029252
 
-// Assign activate code from config xml
+// DC-Synchron parameter settings 
 #define ASSIGN_ACTIVATE 0x0300
 
 // RxPDO object index, subindex
@@ -56,6 +62,7 @@
 #define POS_FOLLOW_WINDOW       0x6065, 0
 #define MODE_OF_OPERATION       0x6060, 0
 #define MODE_OF_OPERATION_DISP  0x6061, 0
+#define TARGET_VELOCITY         0x60FF, 0
 
 
 //* Ethercat variables
@@ -72,12 +79,13 @@ static ec_sdo_request_t *sdo[NUM_JOINTS];
 
 
 #define CLOCK_TO_USE CLOCK_MONOTONIC
-#define FREQUENCY 1000
+#define FREQUENCY 100
 #define NSEC_PER_SEC (1000000000L)
+#define MSEC_PER_SEC (1000)
 #define PERIOD_NS (NSEC_PER_SEC / FREQUENCY)
 #define TIMESPEC2NS(T) ((uint64_t) (T).tv_sec * NSEC_PER_SEC + (T).tv_nsec)
 struct timespec time_ns;
-
+const struct timespec cycletime = {0, PERIOD_NS};
 
 // CiA 402 PDS FSA States
 typedef enum{

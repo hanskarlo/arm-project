@@ -165,7 +165,17 @@ namespace zeroerr_hardware
         for (uint i = 0; i < NUM_JOINTS; i++)
         {
             arm_commands.name[i] = info_.joints[i].name;
-            arm_commands.position[i] = arm_position_commands_[i];
+            
+            if (arm_position_commands_[i] != latest_arm_state_.position[i])
+            {
+                arm_commands.position[i] = arm_position_commands_[i];
+            }
+            else
+            {
+                arm_commands.position[i] = latest_arm_state_.position[i];
+            }
+
+
 
             // RCLCPP_INFO(
             //     rclcpp::get_logger(LOGGER), "Got command %.5f for j%d!",

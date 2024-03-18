@@ -5,7 +5,7 @@
 #include "ec_defines.h"
 
 #include "rclcpp/rclcpp.hpp"
-#include "sensor_msgs/sensor_msgs/msg/joint_state.hpp"
+#include "sensor_msgs/msg/joint_state.hpp"
 
 
 #define PI          3.1415926538979323846
@@ -18,6 +18,7 @@
 // Macro converting radians to eRob encoder count
 #define RAD_TO_COUNT(x) ((x * MAX_COUNT) / TWO_PI)
 
+// bool toggle = false;
 
 using namespace std::chrono_literals;
 
@@ -30,8 +31,14 @@ class ZeroErrInterface : public rclcpp::Node
 
 
     private:
-        const std::chrono::milliseconds CYCLIC_DATA_PERIOD = 1ms;
+        std::chrono::milliseconds CYCLIC_DATA_PERIOD;
         const std::chrono::milliseconds JOINT_STATE_PERIOD = 10ms;
+
+        const uint32_t SYNC0_CYCLE = PERIOD_NS;
+        const int32_t SYNC0_SHIFT = 0;
+
+        int sync_ref_counter = 0;
+        struct timespec wakeupTime;
 
         int joint_no_ = 0;
         unsigned long counter_ = 0;

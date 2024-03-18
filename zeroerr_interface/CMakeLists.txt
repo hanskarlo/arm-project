@@ -12,7 +12,7 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 
 # EtherLab
-set(ETHERLAB_DIR /usr/local/etherlab)
+set(ETHERLAB_DIR /opt/etherlab)
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 find_library(ETHERCAT_LIB ethercat HINTS ${ETHERLAB_DIR}/lib)

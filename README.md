@@ -1,9 +1,9 @@
 # ZeroErr Arm MoveIt2 Repository
 
 ## About
-This repository hosts the software for ROS2 integration with a 6 DoF 5kg ZeroErr arm for leveraging MoveIt2 features such as motion/trajectory planning, kinematic control, collistion checking, and 3D perception.
+This repository hosts the software for ROS2 integration with a 6 DoF 5kg ZeroErr arm for leveraging MoveIt2 features such as motion/trajectory planning, kinematic control, collision checking, and 3D perception.
 
-The software was tested on a ASUS PN50 with
+The software was tested on an ASUS PN50 with
 - Ryzen 5 4500U, 16GB Ram
 - Realtek Semiconductor RTL8111/8168/8411 Gigabit Ethernet Controller
 - Linux kernel 6.6.18 with PREEMPT_RT patch (6.6.18-rt23)
