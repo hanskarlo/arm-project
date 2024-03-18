@@ -89,7 +89,7 @@
     type="continuous">
     <origin
       xyz="0.0775 -0.0775 0.0389"
-      rpy="1.57 0 0" />
+      rpy="1.57 0 -1.570796327" />
     <parent
       link="base_link" />
     <child
@@ -148,7 +148,7 @@
     <child
       link="j2_Link" />
     <axis
-      xyz="0 0 1" />
+      xyz="0 0 -1" />
   </joint>
   <link
     name="j3_Link">
@@ -254,7 +254,7 @@
     <child
       link="j4_Link" />
     <axis
-      xyz="0 0 1" />
+      xyz="0 0 -1" />
   </joint>
   <link
     name="j5_Link">

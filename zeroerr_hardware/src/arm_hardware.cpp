@@ -44,7 +44,7 @@ namespace zeroerr_hardware
         options.arguments({ "--ros-args", "-r", "__node:=" + info_.name });
 
         
-        //* Make node to publish/subscribe to pySOEM node
+        //* Make node to publish/subscribe to arm topics
         LOG_INFO("[on_init] Making ros2 control arm hardware interface node");
         hw_node_ = rclcpp::Node::make_shared("_", options);
 
@@ -160,21 +160,23 @@ namespace zeroerr_hardware
         // Get timestamp
         auto timestamp = hw_node_->now();
         arm_commands.header.stamp = timestamp;
+
         
         //* Fill arm_commands with updated arm_position_commands from command interface
         for (uint i = 0; i < NUM_JOINTS; i++)
         {
             arm_commands.name[i] = info_.joints[i].name;
-            
-            if (arm_position_commands_[i] != latest_arm_state_.position[i])
-            {
-                arm_commands.position[i] = arm_position_commands_[i];
-            }
-            else
-            {
-                arm_commands.position[i] = latest_arm_state_.position[i];
-            }
 
+
+
+            // if (arm_position_commands_[i] != 0)
+            // {
+                arm_commands.position[i] = arm_position_commands_[i];
+            // }
+            // else
+            // {
+                // arm_commands.position[i] = latest_arm_state_.position[i];
+            // }
 
 
             // RCLCPP_INFO(
@@ -182,6 +184,9 @@ namespace zeroerr_hardware
             //     arm_commands.position[i], (i + 1)
             // );
         }
+        // RCLCPP_INFO(rclcpp::get_logger(LOGGER), "[write] j6 state: %f", latest_arm_state_.position[5]);
+        // RCLCPP_INFO(rclcpp::get_logger(LOGGER), "[write] j6 arm_position_command: %f", arm_position_commands_[5]);
+        // RCLCPP_INFO(rclcpp::get_logger(LOGGER), "[write] j6 arm/command msg: %f", arm_commands.position[5]);
 
         //* Publish arm_commands to arm/command topic
         if (rclcpp::ok())

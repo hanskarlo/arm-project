@@ -1,6 +1,5 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="zeroerr_arm">
-    <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
     <xacro:arg name="ros2_control_hardware_type" default="mock_components" />
 
     <!-- Import zeroerr_arm urdf file -->
@@ -9,6 +8,6 @@
     <!-- Import control_xacro -->
     <xacro:include filename="zeroerr_arm.ros2_control.xacro" />
 
-    <xacro:zeroerr_arm_ros2_control name="ZeroErrArm" initial_positions_file="$(arg initial_positions_file)" ros2_control_hardware_type="$(arg ros2_control_hardware_type)"/>
+    <xacro:zeroerr_arm_ros2_control name="ZeroErrArm" ros2_control_hardware_type="$(arg ros2_control_hardware_type)"/>
 
 </robot>
