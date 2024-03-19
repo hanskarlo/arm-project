@@ -78,7 +78,7 @@ static ec_sdo_request_t *sdo[NUM_JOINTS];
 
 
 #define CLOCK_TO_USE CLOCK_MONOTONIC
-#define FREQUENCY 200
+#define FREQUENCY 1000
 #define NSEC_PER_SEC (1000000000L)
 #define MSEC_PER_SEC (1000)
 #define PERIOD_NS (NSEC_PER_SEC / FREQUENCY)

@@ -133,6 +133,9 @@ namespace zeroerr_hardware
             
             // Flag indicating enabling joint commands to be sent
             bool commands_ready_ = false;
+            
+            const double PI = 3.141592654;
+            const double COUNT_THRESHOLD = 0.005992112; // 500 enc counts to rad
     };
 
     

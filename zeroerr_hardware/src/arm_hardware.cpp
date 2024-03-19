@@ -193,21 +193,36 @@ namespace zeroerr_hardware
         for (uint i = 0; i < NUM_JOINTS; i++)
         {
             arm_commands.name[i] = info_.joints[i].name;
-            arm_commands.position[i] = arm_position_commands_[i];
+            
+            // Only issue command if difference b/e state and command passes threshold
+            if (abs(latest_arm_state_.position[i] - arm_position_commands_[i]) >= COUNT_THRESHOLD)
+            {
+    
+                /**
+                 * Joint trajectory controller will convert current joint state to range [-pi, pi].
+                 * i.e. if current joint state is 3.74 (rad), joint trajectory controller converts this to -2.54 (rad)
+                 * and begins motion planning from -2.54.
+                 */
+                if (latest_arm_state_.position[i] < -PI)
+                {
+                    uint pi_factor = abs((latest_arm_state_.position[i] / (2*PI))) + 1;
 
-            // RCLCPP_INFO(
-            //     rclcpp::get_logger(LOGGER), "Got command %.5f for j%d!",
-            //     arm_commands.position[i], (i + 1)
-            // );
+                    arm_position_commands_[i] -= (2*PI) * (pi_factor);
+                }
+                else if(latest_arm_state_.position[i] > PI)
+                {
+                    uint pi_factor = (latest_arm_state_.position[i] / (2*PI)) + 1;
+
+                    arm_position_commands_[i] += (2*PI) * pi_factor;
+                }
+
+            }
+
+            arm_commands.position[i] = arm_position_commands_[i];
         }
-        // RCLCPP_INFO(rclcpp::get_logger(LOGGER), "[write] j6 state: %f", latest_arm_state_.position[5]);
-        // RCLCPP_INFO(rclcpp::get_logger(LOGGER), "[write] j6 arm_position_command: %f", arm_position_commands_[5]);
-        // RCLCPP_INFO(rclcpp::get_logger(LOGGER), "[write] j6 arm/command msg: %f", arm_commands.position[5]);
 
         //* Publish arm_commands to arm/command topic
-        if (rclcpp::ok())
-        {
-            // LOG_INFO("[write] publishing command: ");        
+        if (rclcpp::ok()){
             joint_commands_pub_->publish(arm_commands);
         }
 
