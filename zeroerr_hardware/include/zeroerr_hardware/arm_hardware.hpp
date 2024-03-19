@@ -130,6 +130,9 @@ namespace zeroerr_hardware
 
             // Position command interface vector
             std::vector<double> arm_position_commands_;
+            
+            // Flag indicating enabling joint commands to be sent
+            bool commands_ready_ = false;
     };
 
     

@@ -13,17 +13,12 @@
 
 #define NUM_JOINTS 6
 
+// #define EROB_70H100_MAX_SPEED   262144 // counts/s
 #define EROB_70H100_MAX_SPEED   262144 // counts/s
 #define EROB_70H100_MAX_ADCEL   873813 // counts/s^2
 
 #define EROB_110H120_MAX_SPEED  145927 // counts/s
 #define EROB_110H120_MAX_ADCEL  486423 // counts/s^2
-
-// #define EROB_70H100_MAX_SPEED   262144/10 // counts/s
-// #define EROB_70H100_MAX_ADCEL   873813/10 // counts/s^2
-
-// #define EROB_110H120_MAX_SPEED  145927/10 // counts/s
-// #define EROB_110H120_MAX_ADCEL  486423/10 // counts/s^2
 
 #define JOINT1_ALIAS_POS  0, 0
 #define JOINT2_ALIAS_POS  0, 1
@@ -51,6 +46,7 @@
 // Other objects in dictionary (index, subindex)
 #define SM2_SYNC_TYPE           0x1C32, 1
 #define SM3_SYNC_TYPE           0x1C33, 1
+#define VELOCITY_FOLLOW_ERR_WINDOW  0x3b60, 0
 #define ERROR_CODE              0x603F, 0
 #define MAX_PROFILE_VELOCITY    0x607F, 0
 #define MAX_VELOCITY            0x6080, 0
@@ -59,9 +55,12 @@
 #define PROFILE_VELOCITY        0x6081, 0
 #define PROFILE_ACCELERATION    0x6083, 0
 #define PROFILE_DECELERATION    0x6084, 0
-#define POS_FOLLOW_WINDOW       0x6065, 0
 #define MODE_OF_OPERATION       0x6060, 0
 #define MODE_OF_OPERATION_DISP  0x6061, 0
+#define POS_FOLLOW_ERR_WINDOW   0x6065, 0
+#define POS_FOLLOW_ERR_TIMEOUT  0x6066, 0
+#define POS_WINDOW              0x6067, 0
+#define POS_WINDOW_TIMEOUT      0x6068, 0
 #define TARGET_VELOCITY         0x60FF, 0
 
 
@@ -79,7 +78,7 @@ static ec_sdo_request_t *sdo[NUM_JOINTS];
 
 
 #define CLOCK_TO_USE CLOCK_MONOTONIC
-#define FREQUENCY 100
+#define FREQUENCY 200
 #define NSEC_PER_SEC (1000000000L)
 #define MSEC_PER_SEC (1000)
 #define PERIOD_NS (NSEC_PER_SEC / FREQUENCY)

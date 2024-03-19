@@ -1,3 +1,4 @@
+
 #include "zeroerr_interface/zeroerr_interface.h"
 
 
@@ -87,7 +88,7 @@ bool ZeroErrInterface::init_()
     // }
 
 
-    // if (!set_drive_parameters_()) return false;
+    if (!set_drive_parameters_()) return false;
 
 
     RCLCPP_INFO(this->get_logger(), "Activating master...\n");
@@ -181,7 +182,7 @@ bool ZeroErrInterface::set_drive_parameters_()
         if (ecrt_master_sdo_download(
                 master,
                 i,
-                MAX_VELOCITY,
+                TARGET_VELOCITY,
                 (uint8_t *)&dint,
                 sizeof(dint),
                 &abort_code))
@@ -193,7 +194,7 @@ bool ZeroErrInterface::set_drive_parameters_()
         if (ecrt_master_sdo_upload(
                 master,
                 i,
-                MAX_VELOCITY,
+                TARGET_VELOCITY,
                 (uint8_t *)&dint,
                 sizeof(dint),
                 &result_size,
@@ -294,7 +295,7 @@ bool ZeroErrInterface::set_drive_parameters_()
 
 
         // Profile acceleration
-        uint32_t profile_adcel = (i < 3) ? (EROB_110H120_MAX_ADCEL / 10) : (EROB_70H100_MAX_ADCEL / 10);
+        uint32_t profile_adcel = (i < 3) ? (EROB_110H120_MAX_ADCEL / 10) : (EROB_70H100_MAX_ADCEL);
         // udint = 1400;
         if (ecrt_master_sdo_download(
                 master,
@@ -351,14 +352,14 @@ bool ZeroErrInterface::set_drive_parameters_()
         RCLCPP_INFO(this->get_logger(), "Changed profile deceleration: %u for j%d", profile_adcel, i);
         
 
-        // Position following window
-        uint32_t pos_follow_window = 10000;
+        // Position following error window
+        uint32_t pos_follow_err_window = 1000000000;
         if (ecrt_master_sdo_download(
                 master,
                 i,
-                POS_FOLLOW_WINDOW,
-                (uint8_t *)&pos_follow_window,
-                sizeof(pos_follow_window),
+                POS_FOLLOW_ERR_WINDOW,
+                (uint8_t *)&pos_follow_err_window,
+                sizeof(pos_follow_err_window),
                 &abort_code))
         {
             RCLCPP_ERROR(this->get_logger(), "Failed to change Position following window for j%d", i);
@@ -368,17 +369,104 @@ bool ZeroErrInterface::set_drive_parameters_()
         if (ecrt_master_sdo_upload(
                 master,
                 i,
-                POS_FOLLOW_WINDOW,
-                (uint8_t *)&pos_follow_window,
-                sizeof(pos_follow_window),
+                POS_FOLLOW_ERR_WINDOW,
+                (uint8_t *)&pos_follow_err_window,
+                sizeof(pos_follow_err_window),
                 &result_size,
                 &abort_code))
         {
             RCLCPP_ERROR(this->get_logger(), "Failed to change Position following window for j%d", i);
             return false;
         }
-        RCLCPP_INFO(this->get_logger(), "Changed Position following window %u for j%d", pos_follow_window, i);
+        RCLCPP_INFO(this->get_logger(), "Changed Position following error window %u for j%d", pos_follow_err_window, i);
 
+
+        // Position following error timeout
+        //? Changing position window timeout (0x6068) changes this parameter too
+        // uint16_t pos_follow_err_timeout = 5000; //ms
+        // if (ecrt_master_sdo_download(
+        //         master,
+        //         i,
+        //         POS_FOLLOW_ERR_TIMEOUT,
+        //         (uint8_t *)&pos_follow_err_timeout,
+        //         sizeof(pos_follow_err_timeout),
+        //         &abort_code))
+        // {
+        //     RCLCPP_ERROR(this->get_logger(), "Failed to change position following error window for j%d", i);
+        //     return false;
+        // }
+
+        // if (ecrt_master_sdo_upload(
+        //         master,
+        //         i,
+        //         POS_FOLLOW_ERR_TIMEOUT,
+        //         (uint8_t *)&pos_follow_err_timeout,
+        //         sizeof(pos_follow_err_timeout),
+        //         &result_size,
+        //         &abort_code))
+        // {
+        //     RCLCPP_ERROR(this->get_logger(), "Failed to change position following error window for j%d", i);
+        //     return false;
+        // }
+        // RCLCPP_INFO(this->get_logger(), "Changed position following error window %ums for j%d", pos_follow_err_timeout, i);
+
+
+        // Position window
+        uint32_t pos_window = pos_follow_err_window;
+        if (ecrt_master_sdo_download(
+                master,
+                i,
+                POS_WINDOW,
+                (uint8_t *)&pos_window,
+                sizeof(pos_window),
+                &abort_code))
+        {
+            RCLCPP_ERROR(this->get_logger(), "Failed to change position window for j%d", i);
+            return false;
+        }
+
+        if (ecrt_master_sdo_upload(
+                master,
+                i,
+                POS_WINDOW,
+                (uint8_t *)&pos_window,
+                sizeof(pos_window),
+                &result_size,
+                &abort_code))
+        {
+            RCLCPP_ERROR(this->get_logger(), "Failed to change position window for j%d", i);
+            return false;
+        }
+        RCLCPP_INFO(this->get_logger(), "Changed position window %u for j%d", pos_window, i);
+
+
+        // Position following timeout
+        uint16_t pos_window_timeout = 5000; //ms
+        if (ecrt_master_sdo_download(
+                master,
+                i,
+                POS_WINDOW_TIMEOUT,
+                (uint8_t *)&pos_window_timeout,
+                sizeof(pos_window_timeout),
+                &abort_code))
+        {
+            RCLCPP_ERROR(this->get_logger(), "Failed to change position window timeout for j%d", i);
+            return false;
+        }
+
+        if (ecrt_master_sdo_upload(
+                master,
+                i,
+                POS_WINDOW_TIMEOUT,
+                (uint8_t *)&pos_window_timeout,
+                sizeof(pos_window_timeout),
+                &result_size,
+                &abort_code))
+        {
+            RCLCPP_ERROR(this->get_logger(), "Failed to change position window timeout for j%d", i);
+            return false;
+        }
+        RCLCPP_INFO(this->get_logger(), "Changed position window timeout %ums for j%d", pos_window_timeout, i);
 
 
 
@@ -428,37 +516,40 @@ bool ZeroErrInterface::set_drive_parameters_()
         }
         RCLCPP_INFO(this->get_logger(), "Current position: %d (counts) for j%d", current_pos, i);
 
-        // Set target position to current position
-        if (ecrt_master_sdo_download(
-                master,
-                i,
-                TARGET_POS_INDEX,
-                (uint8_t *)&current_pos,
-                sizeof(current_pos),
-                &abort_code))
-        {
-            RCLCPP_ERROR(this->get_logger(), "Failed to change target position (0x607A) for j%d", i);
-            return false;
-        }
-
-        // Read and verify changed target position
-        if (ecrt_master_sdo_upload(
-                master,
-                i,
-                TARGET_POS_INDEX,
-                (uint8_t *)&current_pos,
-                sizeof(current_pos),
-                &result_size,
-                &abort_code))
-        {
-            RCLCPP_ERROR(this->get_logger(), "Failed to change target position (0x607A) for j%d", i);
-            return false;
-        }
-        RCLCPP_INFO(this->get_logger(), "Target position: %d (counts) for j%d\n", current_pos, i);
-    
 
         // Set joint commands to current positions
         joint_commands_[i] = current_pos;
+
+
+        // Velocity following error window
+        uint32_t vel_follow_err_window = 150000;
+        if (ecrt_master_sdo_download(
+                master,
+                i,
+                VELOCITY_FOLLOW_ERR_WINDOW,
+                (uint8_t *)&vel_follow_err_window,
+                sizeof(vel_follow_err_window),
+                &abort_code))
+        {
+            RCLCPP_INFO(this->get_logger(), "Failed to velocity following error window for j%d", i);
+            return false;
+        }
+
+        if (ecrt_master_sdo_upload(
+                master,
+                i,
+                VELOCITY_FOLLOW_ERR_WINDOW,
+                (uint8_t *)&vel_follow_err_window,
+                sizeof(vel_follow_err_window),
+                &result_size,
+                &abort_code))
+        {
+            RCLCPP_ERROR(this->get_logger(), "Failed to velocity following error window for j%d", i);
+            return false;
+        }
+        RCLCPP_INFO(this->get_logger(), "Changed velocity following error window %u for j%d\n", vel_follow_err_window, i);
+    
+
 
 
         // Setup DC-Synchronization 
@@ -511,7 +602,7 @@ bool ZeroErrInterface::state_transition_()
         if (driveState[joint_no_] != SWITCH_ON_DISABLED)
         {
             driveState[joint_no_] = SWITCH_ON_DISABLED;
-            RCLCPP_INFO(this->get_logger(), " J%d State: Switch on disabled", joint_no_);
+            // RCLCPP_INFO(this->get_logger(), " J%d State: Switch on disabled", joint_no_);
         }
     }
     else if ((status_word & 0b01101111) == 0b00100001)
@@ -521,7 +612,7 @@ bool ZeroErrInterface::state_transition_()
         if (driveState[joint_no_] != READY)
         {
             driveState[joint_no_] = READY;
-            RCLCPP_INFO(this->get_logger(), " J%d State: Ready to switch on", joint_no_);
+            // RCLCPP_INFO(this->get_logger(), " J%d State: Ready to switch on", joint_no_);
         }
     }
     else if ((status_word & 0b01101111) == 0b00100011)
@@ -535,8 +626,9 @@ bool ZeroErrInterface::state_transition_()
 
             if (current_pos != target_pos)
             {
-                RCLCPP_ERROR(this->get_logger(), "target pos != current pos, fixing...\n");
+                RCLCPP_ERROR(this->get_logger(), "target pos != current pos, fixing...");
                 EC_WRITE_S32(domain_pd + target_pos_offset[joint_no_], current_pos);
+                joint_commands_[joint_no_] = current_pos;
             }
         }
     }
@@ -545,7 +637,7 @@ bool ZeroErrInterface::state_transition_()
         if (driveState[joint_no_] != OPERATION_ENABLED)
         {
             driveState[joint_no_] = OPERATION_ENABLED;
-            RCLCPP_INFO(this->get_logger(), " J%d State: Operation enabled!", joint_no_);
+            RCLCPP_INFO(this->get_logger(), " J%d State: Operation enabled!\n", joint_no_);
             
             //* Current joint reached Operation Enabled, enable next joint
         }
@@ -565,18 +657,31 @@ bool ZeroErrInterface::state_transition_()
     }
     else if ((status_word & 0b01001111) == 0b00001000)
     {
-        EC_WRITE_U16(domain_pd + ctrl_word_offset[joint_no_], (control_word & 0b11111111) | 0b10000000);
-
         if (driveState[joint_no_] != FAULT)
         {
             driveState[joint_no_] = FAULT;
             RCLCPP_INFO(this->get_logger(), " J%d State: Fault (0x%x)", joint_no_, status_word);
         }
+
+        EC_WRITE_U16(domain_pd + ctrl_word_offset[joint_no_], (control_word & 0b11111111) | 0b10000000);
+
+        // if (!(joint_no_ == 5 && joints_op_enabled_))
+        // {
+        //     RCLCPP_INFO(this->get_logger(), "Clearing fault for J%d", joint_no_);
+        //     EC_WRITE_U16(domain_pd + ctrl_word_offset[joint_no_], (control_word & 0b11111111) | 0b10000000);
+        // }
+        // else
+        // {
+        //     joint_no_ = 5;
+        //     return true;
+        // }
+
     }
 
     if (joint_no_ == NUM_JOINTS) // All joints reached Operation Enabled
     {
         joint_no_ = 0;
+        // joint_no_ = 5;
         return true;
     }
     else
@@ -686,6 +791,8 @@ void ZeroErrInterface::cyclic_pdo_loop_()
             RCLCPP_INFO(this->get_logger(), "Not all joints reached OP, retrying");
             ecrt_master_reset(master);
 
+            joint_no_ = 0;
+
             // receive process data
             ecrt_master_receive(master);
             ecrt_domain_process(domain);
@@ -698,20 +805,20 @@ void ZeroErrInterface::cyclic_pdo_loop_()
     // If all joints reached CiA402 Drive State Operation Enabled
     if (joints_op_enabled_)
     {
-        // int32_t current_pos = EC_READ_S32(domain_pd + target_pos_offset[5]);
-        // int32_t target_pos = current_pos;
-
-        RCLCPP_INFO(this->get_logger(), "Writing target pos %d", joint_commands_[5]);
         for (uint i = 0; i < NUM_JOINTS; i++)
         {
             EC_WRITE_S32(domain_pd + target_pos_offset[i], joint_commands_[i]);
         }   
-    
+
+
+        // int32_t current_pos = EC_READ_S32(domain_pd + actual_pos_offset[5]);
+        // int32_t target_pos = current_pos;
+
         // if (!toggle)
         // {
-        //     if (current_pos < 20000)
+        //     if (current_pos < 262144)
         //     {
-        //         target_pos += 100;
+        //         target_pos += 8000;
         //         EC_WRITE_S32(domain_pd + target_pos_offset[5], target_pos);
         //     }
         //     else
@@ -719,15 +826,16 @@ void ZeroErrInterface::cyclic_pdo_loop_()
         // }
         // else
         // {
-        //     if (current_pos > -20000)
+        //     if (current_pos > -262144)
         //     {
-        //         target_pos -= 100;
+        //         target_pos -= 8000;
         //         EC_WRITE_S32(domain_pd + target_pos_offset[5], target_pos);
         //     }
         //     else
         //         toggle = false;
         // }
     }
+
 
 
 

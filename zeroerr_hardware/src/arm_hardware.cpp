@@ -151,6 +151,33 @@ namespace zeroerr_hardware
 
     hardware_interface::return_type ArmHardwareInterface::write(const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
     {
+        /**
+         * The initial joint commands are all 0, i.e. the joint trajectory controller commands
+         * all joints to go to 0. Joint commands must be the same as the current joint states 
+         * before issuing commands. 
+         */
+        if (!commands_ready_)
+        {
+            uint count = 0;
+            for (uint i = 0; i < NUM_JOINTS; i++)
+            {
+                if (arm_position_commands_[i] == 0.0 && latest_arm_state_.position[i] != 0.0)
+                {
+                    arm_position_commands_[i] = latest_arm_state_.position[i];
+                }
+                else if (arm_position_commands_[i] != 0.0)
+                {
+                    count++;
+                }
+            }
+
+            if (count == NUM_JOINTS)
+                commands_ready_ = true;
+            else
+                return hardware_interface::return_type::OK;
+        }
+
+
         // JointState message to be read by arm
         sensor_msgs::msg::JointState arm_commands;
 
@@ -166,18 +193,7 @@ namespace zeroerr_hardware
         for (uint i = 0; i < NUM_JOINTS; i++)
         {
             arm_commands.name[i] = info_.joints[i].name;
-
-
-
-            // if (arm_position_commands_[i] != 0)
-            // {
-                arm_commands.position[i] = arm_position_commands_[i];
-            // }
-            // else
-            // {
-                // arm_commands.position[i] = latest_arm_state_.position[i];
-            // }
-
+            arm_commands.position[i] = arm_position_commands_[i];
 
             // RCLCPP_INFO(
             //     rclcpp::get_logger(LOGGER), "Got command %.5f for j%d!",
