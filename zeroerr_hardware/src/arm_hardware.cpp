@@ -6,8 +6,6 @@
 #define LOG_INFO(msg)  RCLCPP_INFO(rclcpp::get_logger(LOGGER), msg) 
 #define LOG_ERR(msg)   RCLCPP_FATAL(rclcpp::get_logger(LOGGER), msg) 
 
-#define NUM_JOINTS 6
-
 namespace zeroerr_hardware
 {
     hardware_interface::CallbackReturn ArmHardwareInterface::on_init(const hardware_interface::HardwareInfo& info)
@@ -38,6 +36,12 @@ namespace zeroerr_hardware
         // velocity_states_.assign(6, 0.0);
         // velocity_commands_.assign(6. 0.0);
 
+        // Initialize drive states and adjust_pos_ flags
+        for (uint i = 0; i < NUM_JOINTS; i++)
+        {
+            adjust_pos_[i] = false;
+            current_drive_state_[i] = STATIONARY;
+        }
 
         //* Add random ID to prevent warnings about multiple publishers within the same node
         rclcpp::NodeOptions options;
@@ -149,6 +153,41 @@ namespace zeroerr_hardware
     }
 
 
+    void ArmHardwareInterface::adjust_pos_command_(const uint joint_num)
+    {
+        if (latest_arm_state_.position[joint_num] < -PI)
+        {
+            uint pi_factor = 1;
+            if ( abs(latest_arm_state_.position[joint_num]) > (2*PI) )
+                pi_factor = abs((latest_arm_state_.position[joint_num] / (2*PI)));
+
+            // RCLCPP_INFO(rclcpp::get_logger(LOGGER), "Adjusting J%u pos cmd from %f with pi factor %u", i, arm_position_commands_[i], pi_factor);
+
+            arm_position_commands_[joint_num] -= (2*PI) * (pi_factor);
+
+
+            // Begin adjusting position command interface for this joint
+            adjust_pos_[joint_num] = true;
+        }
+        else if(latest_arm_state_.position[joint_num] > PI)
+        {
+            uint pi_factor = 1;
+            if ( latest_arm_state_.position[joint_num] > (2*PI) )
+                pi_factor = (latest_arm_state_.position[joint_num] / (2*PI));
+
+            arm_position_commands_[joint_num] += (2*PI) * (pi_factor);
+
+            // Begin adjusting position command interface for this joint
+            adjust_pos_[joint_num] = true;
+        }
+        else
+        {
+            // Don't adjust position command interface
+            adjust_pos_[joint_num] = false;
+        }
+    }
+
+
     hardware_interface::return_type ArmHardwareInterface::write(const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
     {
         /**
@@ -193,32 +232,30 @@ namespace zeroerr_hardware
         for (uint i = 0; i < NUM_JOINTS; i++)
         {
             arm_commands.name[i] = info_.joints[i].name;
-            
+
             // Only issue command if difference b/e state and command passes threshold
             if (abs(latest_arm_state_.position[i] - arm_position_commands_[i]) >= COUNT_THRESHOLD)
             {
-    
                 /**
                  * Joint trajectory controller will convert current joint state to range [-pi, pi].
                  * i.e. if current joint state is 3.74 (rad), joint trajectory controller converts this to -2.54 (rad)
                  * and begins motion planning from -2.54.
                  */
-                if (latest_arm_state_.position[i] < -PI)
-                {
-                    uint pi_factor = abs((latest_arm_state_.position[i] / (2*PI))) + 1;
+                if (current_drive_state_[i] == STATIONARY || adjust_pos_[i])
+                    adjust_pos_command_(i);
 
-                    arm_position_commands_[i] -= (2*PI) * (pi_factor);
-                }
-                else if(latest_arm_state_.position[i] > PI)
-                {
-                    uint pi_factor = (latest_arm_state_.position[i] / (2*PI)) + 1;
+                current_drive_state_[i] = IN_MOTION;
+            }
+            else
+            {   
+                current_drive_state_[i] = STATIONARY;
 
-                    arm_position_commands_[i] += (2*PI) * pi_factor;
-                }
-
+                if (adjust_pos_[i])
+                    adjust_pos_command_(i);
             }
 
             arm_commands.position[i] = arm_position_commands_[i];
+
         }
 
         //* Publish arm_commands to arm/command topic

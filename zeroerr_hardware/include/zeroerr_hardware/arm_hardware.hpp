@@ -1,3 +1,4 @@
+
 //* Useful links 
 // https://control.ros.org/master/doc/getting_started/getting_started.html#overview-hardware-components
 // https://control.ros.org/master/doc/ros2_control/hardware_interface/doc/writing_new_hardware_component.html
@@ -117,6 +118,8 @@ namespace zeroerr_hardware
                     return default_value; // return default_value as topic
             }
 
+            void adjust_pos_command_(const uint joint_num);
+
             // Hardware interface node
             rclcpp::Node::SharedPtr hw_node_;
 
@@ -130,12 +133,24 @@ namespace zeroerr_hardware
 
             // Position command interface vector
             std::vector<double> arm_position_commands_;
-            
+
+            static const uint NUM_JOINTS = 6;
+
+            const double PI = 3.141592654;
+            const double COUNT_THRESHOLD = 0.001198422; // 100 enc counts to rad
+
             // Flag indicating enabling joint commands to be sent
             bool commands_ready_ = false;
-            
-            const double PI = 3.141592654;
-            const double COUNT_THRESHOLD = 0.005992112; // 500 enc counts to rad
+
+            // Flag to signal command interface correction
+            bool adjust_pos_[NUM_JOINTS];
+
+            enum DriveState{
+                IN_MOTION,
+                STATIONARY
+            };
+            DriveState current_drive_state_[NUM_JOINTS];
+
     };
 
     

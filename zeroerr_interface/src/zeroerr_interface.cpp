@@ -1,4 +1,3 @@
-
 #include "zeroerr_interface/zeroerr_interface.h"
 
 
@@ -811,9 +810,24 @@ void ZeroErrInterface::cyclic_pdo_loop_()
         }   
 
 
+        // Uncomment to zero actuator
+        // Change index to choose which joint
         // int32_t current_pos = EC_READ_S32(domain_pd + actual_pos_offset[5]);
         // int32_t target_pos = current_pos;
+        // uint32_t delta = 500;
+        // if (abs(current_pos) > delta)
+        // {
+        //     if (current_pos < 0)
+        //         target_pos += delta;
+        //     else if (current_pos > 0)
+        //         target_pos -= delta;
+            
+        //     EC_WRITE_S32(domain_pd + target_pos_offset[5], target_pos);
+        // }
 
+        // Uncomment to jog J6 between [-180, 180]
+        // int32_t current_pos = EC_READ_S32(domain_pd + actual_pos_offset[5]);
+        // int32_t target_pos = current_pos;
         // if (!toggle)
         // {
         //     if (current_pos < 262144)
@@ -896,7 +910,9 @@ void ZeroErrInterface::joint_state_pub_()
 
     for (uint i = 0; i < NUM_JOINTS; i++)
     {
-        joint_states_.position[i] = convert_count_to_rad_(joint_states_enc_counts_[i]);
+        // joint_states_.position[i] = convert_count_to_rad_(joint_states_enc_counts_[i]);
+        joint_states_.position[i] = COUNT_TO_RAD(joint_states_enc_counts_[i]);
+        
     }
 
     arm_state_pub_->publish(joint_states_);
