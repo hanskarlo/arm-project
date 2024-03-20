@@ -6,11 +6,6 @@ controller_manager:
     arm_group_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
-
-    ee_group_controller:
-      type: joint_trajectory_controller/JointTrajectoryController
-
-
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
@@ -20,13 +15,6 @@ arm_group_controller:
       - j1
       - j2
       - j3
-    command_interfaces:
-      - position
-    state_interfaces:
-      - position
-ee_group_controller:
-  ros__parameters:
-    joints:
       - j4
       - j5
       - j6

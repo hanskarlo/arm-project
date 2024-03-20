@@ -127,29 +127,7 @@ def generate_launch_description():
         package="controller_manager",
         executable="spawner",
         arguments=["arm_group_controller", "-c", "/controller_manager"],
-        # prefix=["sudo -E"]
     )
-
-    ee_group_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=["ee_group_controller", "-c", "/controller_manager"],
-        # prefix=["sudo -E"]
-    )
-
-    # Warehouse mongodb server
-    # db_config = LaunchConfiguration("db")
-    # mongodb_server_node = Node(
-    #     package="warehouse_ros_mongo",
-    #     executable="mongo_wrapper_ros.py",
-    #     parameters=[
-    #         {"warehouse_port": 33829},
-    #         {"warehouse_host": "localhost"},
-    #         {"warehouse_plugin": "warehouse_ros_mongo::MongoDatabaseConnection"},
-    #     ],
-    #     output="screen",
-    #     condition=IfCondition(db_config),
-    # )
 
     return LaunchDescription(
         [
@@ -161,7 +139,5 @@ def generate_launch_description():
             ros2_control_node,
             joint_state_broadcaster_spawner,
             arm_group_spawner,
-            ee_group_spawner,
-            # mongodb_server_node,
         ]
     )
