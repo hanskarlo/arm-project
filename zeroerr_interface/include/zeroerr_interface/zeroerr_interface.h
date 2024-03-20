@@ -1,5 +1,6 @@
 #include <chrono>
 #include <string>
+#include <float.h>
 // #include <thread>
 // #include <mutex>
 #include "ec_defines.h"
@@ -18,7 +19,7 @@
 // Macro converting radians to eRob encoder count
 #define RAD_TO_COUNT(x) ((x * MAX_COUNT) / TWO_PI)
 
-// bool toggle = false;
+bool toggle = false;
 
 using namespace std::chrono_literals;
 
@@ -31,6 +32,8 @@ class ZeroErrInterface : public rclcpp::Node
 
 
     private:
+        const std::string LOGGER = "zeroerr_interface";
+
         std::chrono::milliseconds CYCLIC_DATA_PERIOD;
         const std::chrono::milliseconds JOINT_STATE_PERIOD = 10ms;
 
@@ -45,6 +48,20 @@ class ZeroErrInterface : public rclcpp::Node
         double stamp_ = 0;
         bool joints_OP_ = false;
         bool joints_op_enabled_ = false;
+
+        unsigned long loop_start_time_;
+        unsigned long loop_last_start_time;
+        unsigned long loop_end_time_;
+        unsigned long wakeup_time_;
+        unsigned long latency_ns_;
+        unsigned long exec_ns_;
+        unsigned long period_ns_;
+        unsigned long latency_max_ns_ = 0;
+        unsigned long latency_min_ns_ = 0;
+        unsigned long exec_max_ns_ = 0;
+        unsigned long exec_min_ns_ = 0;
+        unsigned long period_max_ns_ = 0;
+        unsigned long period_min_ns_ = 0;
 
         sensor_msgs::msg::JointState joint_states_;
         std::vector<int32_t> joint_states_enc_counts_;
@@ -69,7 +86,6 @@ class ZeroErrInterface : public rclcpp::Node
         bool check_slave_config_states_();
         void check_domain_state_();
         
-        double convert_count_to_rad_(int32_t counts);
         void joint_state_pub_();
 
         void arm_cmd_cb_(sensor_msgs::msg::JointState::UniquePtr arm_cmd);

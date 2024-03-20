@@ -43,6 +43,8 @@ ZeroErrInterface::ZeroErrInterface() : Node("zeroerr_interface")
     joint_state_pub_timer_ = this->create_wall_timer(
         JOINT_STATE_PERIOD,
         std::bind(&ZeroErrInterface::joint_state_pub_, this));
+    
+    // clock_gettime(CLOCK_TO_USE, &wakeupTime);
 }
 
 
@@ -642,18 +644,18 @@ bool ZeroErrInterface::state_transition_()
         }
         joint_no_++;    
     }
-    else if ((status_word & 0b01101111) == 0b00000111)
-    {
-        EC_WRITE_U16(domain_pd + ctrl_word_offset[joint_no_], (control_word & 0b01111111) | 0b00001111);
-        driveState[joint_no_] = QUICK_STOP_ACTIVE;
-        RCLCPP_INFO(this->get_logger(), " J%d State: Quick stop active", joint_no_);
-    }
-    else if ((status_word & 0b01001111) == 0b00001111)
-    {
-        EC_WRITE_U16(domain_pd + ctrl_word_offset[joint_no_], 0x0080);
-        driveState[joint_no_] = FAULT_REACTION_ACTIVE;
-        RCLCPP_INFO(this->get_logger(), " J%d State: Fault reaction active", joint_no_);
-    }
+    // else if ((status_word & 0b01101111) == 0b00000111)
+    // {
+    //     EC_WRITE_U16(domain_pd + ctrl_word_offset[joint_no_], (control_word & 0b01111111) | 0b00001111);
+    //     driveState[joint_no_] = QUICK_STOP_ACTIVE;
+    //     RCLCPP_INFO(this->get_logger(), " J%d State: Quick stop active", joint_no_);
+    // }
+    // else if ((status_word & 0b01001111) == 0b00001111)
+    // {
+    //     EC_WRITE_U16(domain_pd + ctrl_word_offset[joint_no_], 0x0080);
+    //     driveState[joint_no_] = FAULT_REACTION_ACTIVE;
+    //     RCLCPP_INFO(this->get_logger(), " J%d State: Fault reaction active", joint_no_);
+    // }
     else if ((status_word & 0b01001111) == 0b00001000)
     {
         if (driveState[joint_no_] != FAULT)
@@ -739,39 +741,80 @@ struct timespec timespec_add(struct timespec time1, struct timespec time2)
  */
 void ZeroErrInterface::cyclic_pdo_loop_()
 {
+    // loop_start_time_ = (unsigned long) this->now().nanoseconds();
+    
+    // latency_ns_ = loop_start_time_ - wakeup_time_;
+    // period_ns_ = loop_start_time_ - loop_last_start_time;
+    // exec_ns_ = loop_end_time_ - loop_last_start_time;
+    // loop_last_start_time = loop_start_time_;
+
+    // if (latency_ns_ > latency_max_ns_) {
+    //     latency_max_ns_ = (loop_start_time_ > wakeup_time_) ? latency_ns_ : -latency_ns_;
+    // }
+    // if (latency_ns_ < latency_min_ns_) {
+    //     latency_min_ns_ = latency_ns_;
+    // }
+    // if (period_ns_ > period_max_ns_) {
+    //     period_max_ns_ = period_ns_;
+    // }
+    // if (period_ns_ < period_min_ns_) {
+    //     period_min_ns_ = period_ns_;
+    // }
+    // if (exec_ns_ > exec_max_ns_) {
+    //     exec_max_ns_ = exec_ns_;
+    // }
+    // if (exec_ns_ < exec_min_ns_) {
+    //     exec_min_ns_ = exec_ns_;
+    // }
+
+
     // receive process data
     ecrt_master_receive(master);
     ecrt_domain_process(domain);
+
 
     // check process data state (optional)
     // check_domain_state_();
 
     // Read joint states
-    for (uint i = 0; i < NUM_JOINTS; i++)
-        joint_states_enc_counts_[i] = EC_READ_S32(domain_pd + actual_pos_offset[i]);
+    // for (uint i = 0; i < NUM_JOINTS; i++)
+    //     joint_states_enc_counts_[i] = EC_READ_S32(domain_pd + actual_pos_offset[i]);
 
 
-    if (counter_)
-    {
-        counter_--;
-    }
-    else    // Do below every 1s
-    {
-        counter_ = ( 1000 / CYCLIC_DATA_PERIOD.count() );
-
+    // if (counter_)
+    // {
+        // counter_--;
+    // }
+    // else    // Do below every 1s
+    // {
+        // counter_ = ( 1000 / CYCLIC_DATA_PERIOD.count() );
+        // counter_ = FREQUENCY;
+// 
         // check for master state (optional)
         // check_master_state();
-
-        // check for islave configuration state(s) (optional)
+// 
+        // check for slave configuration state(s) (optional)
         // if (!operational_)
-            // operational_ = check_slave_config_states_(joint_no__);
-        
-
-        // RCLCPP_INFO(this->get_logger(), "Hi");
-
+        //     operational_ = check_slave_config_states_(joint_no__);
+        // 
         // read process data SDO
         // read_sdos(joint_no__);
-    }
+// 
+        //* Measure timing
+        // RCLCPP_INFO(this->get_logger(), "period     %luns ... %luns",
+        //         period_min_ns_, period_max_ns_);
+        // RCLCPP_INFO(this->get_logger(), "exec       %luns ... %luns",
+        //         exec_min_ns_, exec_max_ns_);
+        // RCLCPP_INFO(this->get_logger(), "latency    %luns ... %luns\n",
+        //         latency_min_ns_, latency_max_ns_);
+            // 
+        // period_max_ns_ = 0;
+        // period_min_ns_ = (0xffffffffffffffff);
+        // exec_max_ns_ = 0;
+        // exec_min_ns_ = (0xffffffffffffffff);
+        // latency_max_ns_ = 0;
+        // latency_min_ns_ = (0xffffffffffffffff);
+    // }
 
 
     // If all joints reached EtherCAT OP state
@@ -779,6 +822,11 @@ void ZeroErrInterface::cyclic_pdo_loop_()
     {
         // Transit joints through CiA402 PDS FSA
         joints_op_enabled_ = state_transition_();
+
+        // for (uint i = 0; i < NUM_JOINTS; i++)
+            // joint_states_enc_counts_[i] = EC_READ_S32(domain_pd + actual_pos_offset[i]);
+        
+        joint_states_enc_counts_[joint_no_] = EC_READ_S32(domain_pd + actual_pos_offset[joint_no_]);
     }        
     else
     {
@@ -804,50 +852,52 @@ void ZeroErrInterface::cyclic_pdo_loop_()
     // If all joints reached CiA402 Drive State Operation Enabled
     if (joints_op_enabled_)
     {
+        //* Write target positions in TxPDOs from MoveIt joint commands
         for (uint i = 0; i < NUM_JOINTS; i++)
         {
             EC_WRITE_S32(domain_pd + target_pos_offset[i], joint_commands_[i]);
         }   
 
 
-        // Uncomment to zero actuator
-        // Change index to choose which joint
-        // int32_t current_pos = EC_READ_S32(domain_pd + actual_pos_offset[5]);
-        // int32_t target_pos = current_pos;
-        // uint32_t delta = 500;
-        // if (abs(current_pos) > delta)
-        // {
-        //     if (current_pos < 0)
-        //         target_pos += delta;
-        //     else if (current_pos > 0)
-        //         target_pos -= delta;
-            
-        //     EC_WRITE_S32(domain_pd + target_pos_offset[5], target_pos);
-        // }
+    //     //* Uncomment to zero actuator
+    //     // uint joint_index = 3; // Change index to choose which joint to zero
+    //     // int32_t current_pos = EC_READ_S32(domain_pd + actual_pos_offset[joint_index]);
+    //     // int32_t target_pos = current_pos;
+    //     // uint32_t delta = 250;
+    //     // if (abs(current_pos) > delta)
+    //     // {
+    //     //     if (current_pos < 0)
+    //     //         target_pos += delta;
+    //     //     else if (current_pos > 0)
+    //     //         target_pos -= delta;
+    //     //          
+    //     //     EC_WRITE_S32(domain_pd + target_pos_offset[joint_index], target_pos);
+    //     // }
 
-        // Uncomment to jog J6 between [-180, 180]
-        // int32_t current_pos = EC_READ_S32(domain_pd + actual_pos_offset[5]);
-        // int32_t target_pos = current_pos;
-        // if (!toggle)
-        // {
-        //     if (current_pos < 262144)
-        //     {
-        //         target_pos += 8000;
-        //         EC_WRITE_S32(domain_pd + target_pos_offset[5], target_pos);
-        //     }
-        //     else
-        //         toggle = true;
-        // }
-        // else
-        // {
-        //     if (current_pos > -262144)
-        //     {
-        //         target_pos -= 8000;
-        //         EC_WRITE_S32(domain_pd + target_pos_offset[5], target_pos);
-        //     }
-        //     else
-        //         toggle = false;
-        // }
+    //     //* Uncomment to jog J6 between [-180, 180]
+    //     // int32_t current_pos = EC_READ_S32(domain_pd + actual_pos_offset[5]);
+    //     // int32_t target_pos = current_pos;
+    //     // if (!toggle)
+    //     // {
+    //     //     if (current_pos < 262144)
+    //     //     {
+    //     //         target_pos += 8000;
+    //     //         EC_WRITE_S32(domain_pd + target_pos_offset[5], target_pos);
+    //     //     }
+    //     //     else
+    //     //         toggle = true;
+    //     // }
+    //     // else
+    //     // {
+    //     //     if (current_pos > -262144)
+    //     //     {
+    //     //         target_pos -= 8000;
+    //     //         EC_WRITE_S32(domain_pd + target_pos_offset[5], target_pos);
+    //     //     }
+    //     //     else
+    //     //         toggle = false;
+    //     // }
+
     }
 
 
@@ -859,7 +909,9 @@ void ZeroErrInterface::cyclic_pdo_loop_()
     // It is a good idea to use the target time (not the measured time) as
     // application time, because it is more stable.
     //
-    // wakeupTime = timespec_add(wakeupTime, cycletime);
+    // struct timespec t;
+    // clock_gettime(CLOCK_REALTIME, &t);
+    // ecrt_master_application_time(master, TIMESPEC2NS(t));
     // ecrt_master_application_time(master, TIMESPEC2NS(wakeupTime));
 
     // if (sync_ref_counter)
@@ -872,31 +924,19 @@ void ZeroErrInterface::cyclic_pdo_loop_()
     //     clock_gettime(CLOCK_TO_USE, &time_ns);
     //     ecrt_master_sync_reference_clock_to(master, TIMESPEC2NS(time_ns));
     // }
+    // ecrt_master_sync_reference_clock(master);
     // ecrt_master_sync_slave_clocks(master);
 
     // send process data
     ecrt_domain_queue(domain);
     ecrt_master_send(master);
 
+    // loop_end_time_ = (unsigned long) this->now().nanoseconds();
+    // wakeup_time_ = loop_end_time_ + PERIOD_NS;
+
     // clock_gettime(CLOCK_TO_USE, &wakeupTime);
 }
 
-double ZeroErrInterface::convert_count_to_rad_(int32_t counts)
-{
-    double radians;
-
-    if ( (counts > 0) ? (counts > MAX_COUNT) : (abs(counts) > MAX_COUNT))
-    {
-        double scaled_counts = (counts > 0) ? (MAX_COUNT - (counts % MAX_COUNT)) : -(MAX_COUNT - (abs(counts) % MAX_COUNT));
-        radians = COUNT_TO_RAD(scaled_counts);
-    }
-    else
-    {
-        radians = COUNT_TO_RAD(counts);
-    }
-
-    return radians;
-}
 
 /**
  * @brief Joint state publisher callback.
@@ -910,9 +950,7 @@ void ZeroErrInterface::joint_state_pub_()
 
     for (uint i = 0; i < NUM_JOINTS; i++)
     {
-        // joint_states_.position[i] = convert_count_to_rad_(joint_states_enc_counts_[i]);
         joint_states_.position[i] = COUNT_TO_RAD(joint_states_enc_counts_[i]);
-        
     }
 
     arm_state_pub_->publish(joint_states_);
