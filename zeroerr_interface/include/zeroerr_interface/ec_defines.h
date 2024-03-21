@@ -143,7 +143,7 @@ const static ec_pdo_entry_reg_t domain_regs_[] = {
     {JOINT6_ALIAS_POS, ZEROERR_EROB, STATUS_WORD_INDEX, &status_word_offset[5], NULL},
     {JOINT6_ALIAS_POS, ZEROERR_EROB, TARGET_POS_INDEX,  &target_pos_offset[5], NULL},
     {JOINT6_ALIAS_POS, ZEROERR_EROB, CTRL_WORD_INDEX,   &ctrl_word_offset[5], NULL},
-    {} //! Terminate with empty struct
+    {} //! Terminate with empty struct, ignore compiler warning
 };
 
 
@@ -166,5 +166,5 @@ static ec_sync_info_t erob_syncs_[] = {
     {1, EC_DIR_INPUT, 0, NULL, EC_WD_DISABLE},
     {2, EC_DIR_OUTPUT, 1, erob_pdos_, EC_WD_ENABLE},
     {3, EC_DIR_INPUT, 1, erob_pdos_ + 1, EC_WD_DISABLE},
-    {0xff}
+    {0xff} //! 0xFF marks end of list, ignore compiler warning
 };

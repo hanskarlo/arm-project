@@ -296,8 +296,7 @@ bool ZeroErrInterface::set_drive_parameters_()
 
 
         // Profile acceleration
-        uint32_t profile_adcel = (i < 3) ? (EROB_110H120_MAX_ADCEL / 10) : (EROB_70H100_MAX_ADCEL);
-        // udint = 1400;
+        uint32_t profile_adcel = (i < 3) ? (EROB_110H120_MAX_ADCEL) : (EROB_70H100_MAX_ADCEL);
         if (ecrt_master_sdo_download(
                 master,
                 i,
