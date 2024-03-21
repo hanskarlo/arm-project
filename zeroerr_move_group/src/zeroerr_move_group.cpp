@@ -7,6 +7,7 @@
 ArmMoveGroup::ArmMoveGroup()
 {
 	rclcpp::NodeOptions node_options;
+	node_options.automatically_declare_parameters_from_overrides(true);
 	mg_node_ = rclcpp::Node::make_shared("mg_node_", node_options);
 	node_ = rclcpp::Node::make_shared(NODE_NAME, node_options);
 
@@ -47,16 +48,16 @@ ArmMoveGroup::ArmMoveGroup()
 	// planning_scene_interface_.applyCollisionObject(table_);
 
 
-	arm_joint_space_sub_ = node_->create_subscription<zeroerr_msgs::msg::ArmJointSpace>(
+	arm_joint_space_sub_ = node_->create_subscription<zeroerr_msgs::msg::JointSpaceTarget>(
 		"arm/JointSpaceGoal",
 		rclcpp::QoS(10),
 		std::bind(&ArmMoveGroup::arm_joint_space_cb_, this, std::placeholders::_1)
 	);
 
-	arm_point_sub_ = node_->create_subscription<zeroerr_msgs::msg::ArmPoint>(
-		"arm/PointGoal",
+	arm_point_sub_ = node_->create_subscription<zeroerr_msgs::msg::PoseTarget>(
+		"arm/PoseGoal",
 		rclcpp::QoS(10),
-		std::bind(&ArmMoveGroup::arm_point_cb_, this, std::placeholders::_1)
+		std::bind(&ArmMoveGroup::arm_pose_cb_, this, std::placeholders::_1)
 	);
 
 	arm_execute_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
@@ -89,7 +90,7 @@ ArmMoveGroup::~ArmMoveGroup()
 }
 
 
-void ArmMoveGroup::arm_joint_space_cb_(zeroerr_msgs::msg::ArmJointSpace::SharedPtr goal_msg)
+void ArmMoveGroup::arm_joint_space_cb_(zeroerr_msgs::msg::JointSpaceTarget::SharedPtr goal_msg)
 {
 	RCLCPP_INFO(node_->get_logger(), "Joint space goal received.");
 	joint_space_goal_recv_ = true;
@@ -110,7 +111,7 @@ void ArmMoveGroup::arm_joint_space_cb_(zeroerr_msgs::msg::ArmJointSpace::SharedP
 	current_state->copyJointGroupPositions(joint_model_group, joint_group_positions);
 
 	for (uint i = 0; i < NUM_JOINTS; i++)
-		joint_group_positions[i] = ((goal_msg->joint_pos_deg[i] * PI) / 180); // Deg -> Rad
+		joint_group_positions[i] = ((goal_msg->joint_deg[i] * PI) / 180); // Deg -> Rad
 	// RCLCPP_INFO(node_->get_logger(), "Converted deg to rad!\n");
 
 	bool within_bounds = move_group.setJointValueTarget(joint_group_positions);
@@ -131,7 +132,7 @@ void ArmMoveGroup::arm_joint_space_cb_(zeroerr_msgs::msg::ArmJointSpace::SharedP
 
 
 
-void ArmMoveGroup::arm_point_cb_(zeroerr_msgs::msg::ArmPoint::SharedPtr goal_msg)
+void ArmMoveGroup::arm_pose_cb_(zeroerr_msgs::msg::PoseTarget::SharedPtr goal_msg)
 {
 	RCLCPP_INFO(node_->get_logger(), "Pose goal receieved.");
 	pose_goal_recv_ = true;
@@ -255,9 +256,9 @@ int main(int argc, char** argv)
 	}
 	catch(const std::exception& e)
 	{
-		std::cerr << e.what() << '\n';
+		std::cerr << "Exception caught during spin: " << e.what() << '\n';
 	}
 
 	rclcpp::shutdown();
 	return 0;
-}   
+}

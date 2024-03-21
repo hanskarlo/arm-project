@@ -12,8 +12,8 @@ find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
 set(msg_files
-  "msg/ArmJointSpace.msg"
-  "msg/ArmPoint.msg"
+  "msg/JointSpaceTarget.msg"
+  "msg/PoseTarget.msg"
 )
 
 rosidl_generate_interfaces(
