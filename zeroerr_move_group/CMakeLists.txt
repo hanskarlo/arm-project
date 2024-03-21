@@ -14,6 +14,7 @@ find_package(moveit_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
 find_package(moveit_visual_tools REQUIRED)
+find_package(zeroerr_msgs REQUIRED)
 
 add_executable(zeroerr_move_group src/zeroerr_move_group.cpp)
 target_include_directories(zeroerr_move_group PUBLIC
@@ -27,6 +28,7 @@ ament_target_dependencies(
   "moveit_core"
   "moveit_msgs"
   "geometry_msgs"
+  "zeroerr_msgs"
   "moveit_ros_planning_interface"
   "moveit_visual_tools"
 )
