@@ -131,6 +131,23 @@ void ArmMoveGroup::arm_joint_space_cb_(zeroerr_msgs::msg::JointSpaceTarget::Shar
 }
 
 
+void ArmMoveGroup::pose_array_cb_(zeroerr_msgs::msg::PoseTargetArray::SharedPtr pose_array_msg)
+{
+	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+
+	std::vector<geometry_msgs::msg::Pose> waypoints;
+
+	for (size_t i = 0; i < pose_array_msg->waypoints.size(); i++)
+		waypoints.push_back(pose_array_msg->waypoints[i]);
+
+	moveit_msgs::msg::RobotTrajectory trajectory;
+	const double jump_threshold = 0.0;	// Disable jump threshold
+	const double eef_step = 0.01; 		// 1cm interpolation resolution
+	double fraction = move_group.computeCartesianPath(waypoints, eef_step, jump_threshold, trajectory);
+
+	RCLCPP_INFO(node_->get_logger(), "Planning cartesian path (%.2f%% achieved)", fraction * 100.0);
+}
+
 
 void ArmMoveGroup::arm_pose_cb_(zeroerr_msgs::msg::PoseTarget::SharedPtr goal_msg)
 {

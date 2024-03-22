@@ -13,6 +13,7 @@ find_package(geometry_msgs REQUIRED)
 
 set(msg_files
   "msg/JointSpaceTarget.msg"
+  "msg/PoseTargetArray.msg"
   "msg/PoseTarget.msg"
 )
 

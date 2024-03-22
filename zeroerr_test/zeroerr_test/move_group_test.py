@@ -159,8 +159,15 @@ class MoveGroupTest(Node):
                     self.get_logger().info("Execution cancelled, homing arm.")
                     # self.clear_pub_.publish(msg)
 
+                    jst = JointSpaceTarget()
                     jst.speed = 15
-                    jst.joint_deg.
+                    self.joint_space_target_pub_.publish(jst)
+
+                    if input("Execute (y/n)?").lower() == 'y':
+                        self.get_logger().info("Homing arm.")
+                        self.execute_pub_.publish(msg)
+                    
+                    break
 
 
             self.get_logger().info("Stop test finished!")
@@ -176,7 +183,7 @@ class MoveGroupTest(Node):
         self.get_logger().info('Homing!')
 
         jst = JointSpaceTarget()
-        jst.speed = 10
+        jst.speed = 15
         jst.joint_deg[0] = 0
         jst.joint_deg[1] = 0
         jst.joint_deg[2] = 0

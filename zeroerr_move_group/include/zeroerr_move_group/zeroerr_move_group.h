@@ -17,6 +17,7 @@
 #include <std_msgs/msg/bool.hpp>
 
 #include "zeroerr_msgs/msg/joint_space_target.hpp"
+#include "zeroerr_msgs/msg/pose_target_array.hpp"
 #include "zeroerr_msgs/msg/pose_target.hpp"
 
 using namespace std::chrono_literals;
@@ -44,6 +45,7 @@ class ArmMoveGroup
         bool pose_goal_recv_ = false;
 
         rclcpp::Subscription<zeroerr_msgs::msg::JointSpaceTarget>::SharedPtr arm_joint_space_sub_;
+        rclcpp::Subscription<zeroerr_msgs::msg::JointSpaceTarget>::SharedPtr pose_array_sub_;
         rclcpp::Subscription<zeroerr_msgs::msg::PoseTarget>::SharedPtr arm_point_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_execute_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_stop_sub_;
@@ -51,6 +53,7 @@ class ArmMoveGroup
 
 
         void arm_joint_space_cb_(zeroerr_msgs::msg::JointSpaceTarget::SharedPtr goal_msg);
+        void pose_array_cb_(zeroerr_msgs::msg::PoseTargetArray::SharedPtr pose_array_msg);
         void arm_pose_cb_(zeroerr_msgs::msg::PoseTarget::SharedPtr goal_msg);
         void arm_execute_cb_(const std_msgs::msg::Bool::SharedPtr execute_msg);
         void arm_stop_cb_(const std_msgs::msg::Bool::SharedPtr stop_msg);
