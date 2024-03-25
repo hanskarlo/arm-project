@@ -11,71 +11,46 @@ ArmMoveGroup::ArmMoveGroup()
 	mg_node_ = rclcpp::Node::make_shared("mg_node_", node_options);
 	node_ = rclcpp::Node::make_shared(NODE_NAME, node_options);
 
-	// auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
-	
-	// RCLCPP_INFO(node_->get_logger(), "Initializing ArmMoveGroup");
-	// RCLCPP_INFO(node_->get_logger(), "Planning frame: %s", move_group.getPlanningFrame().c_str());
-	// RCLCPP_INFO(node_->get_logger(), "End effector link: %s", move_group.getEndEffectorLink().c_str());
-
-	// // std::vector<double> current_joint_pos = move_group.getCurrentJointValues();
-
-	// // RCLCPP_INFO(node_->get_logger(), "Current joint positions:");
-	// // for (uint i = 0; i < NUM_JOINTS; i++)
-	// // 	RCLCPP_INFO(node_->get_logger(), "J%d: %f", i, current_joint_pos[i]);
-
-	// //* Place table underneath arm
-	// table_.header.frame_id = move_group.getPlanningFrame();
-
-	// table_.id = "table1";
-
-	// shape_msgs::msg::SolidPrimitive primitive;
-	// primitive.type = primitive.BOX;
-	// primitive.dimensions.resize(3);
-	// primitive.dimensions[primitive.BOX_X] = 0.91;
-	// primitive.dimensions[primitive.BOX_Y] = 1.54;
-	// primitive.dimensions[primitive.BOX_Z] = 0.08;
-
-	// geometry_msgs::msg::Pose table_pose;
-	// table_pose.orientation.w = 1.0;
-	// table_pose.position.x = 0.405;
-	// table_pose.position.y = -0.67;
-	// table_pose.position.z = -0.07;
-
-	// table_.primitives.push_back(primitive);
-	// table_.primitive_poses.push_back(table_pose);
-	// table_.operation = table_.ADD;
-
-	// planning_scene_interface_.applyCollisionObject(table_);
-
-
-	arm_joint_space_sub_ = node_->create_subscription<zeroerr_msgs::msg::JointSpaceTarget>(
-		"arm/JointSpaceGoal",
+	collision_obj_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
+		"arm/SetupLabEnvironment",
 		rclcpp::QoS(10),
-		std::bind(&ArmMoveGroup::arm_joint_space_cb_, this, std::placeholders::_1)
+		std::bind(&ArmMoveGroup::coll_obj_cb_, this, std::placeholders::_1)
 	);
 
-	arm_point_sub_ = node_->create_subscription<zeroerr_msgs::msg::PoseTarget>(
+	joint_space_sub_ = node_->create_subscription<zeroerr_msgs::msg::JointSpaceTarget>(
+		"arm/JointSpaceGoal",
+		rclcpp::QoS(10),
+		std::bind(&ArmMoveGroup::joint_space_cb_, this, std::placeholders::_1)
+	);
+
+	pose_array_sub_ = node_->create_subscription<zeroerr_msgs::msg::PoseTargetArray>(
+		"arm/PoseGoalArray",
+		rclcpp::QoS(10),
+		std::bind(&ArmMoveGroup::pose_array_cb_, this, std::placeholders::_1)
+	);
+
+	pose_sub_ = node_->create_subscription<zeroerr_msgs::msg::PoseTarget>(
 		"arm/PoseGoal",
 		rclcpp::QoS(10),
-		std::bind(&ArmMoveGroup::arm_pose_cb_, this, std::placeholders::_1)
+		std::bind(&ArmMoveGroup::pose_cb_, this, std::placeholders::_1)
 	);
 
 	arm_execute_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
 		"arm/Execute",
 		rclcpp::QoS(1),
-		std::bind(&ArmMoveGroup::arm_execute_cb_, this, std::placeholders::_1)
+		std::bind(&ArmMoveGroup::execute_cb_, this, std::placeholders::_1)
 	);
 
 	arm_stop_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
 		"arm/Stop",
 		rclcpp::QoS(1),
-		std::bind(&ArmMoveGroup::arm_stop_cb_, this, std::placeholders::_1)
+		std::bind(&ArmMoveGroup::stop_cb_, this, std::placeholders::_1)
 	);
 
 	arm_clear_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
 		"arm/Clear",
 		rclcpp::QoS(1),
-		std::bind(&ArmMoveGroup::arm_clear_cb_, this, std::placeholders::_1)
+		std::bind(&ArmMoveGroup::clear_cb_, this, std::placeholders::_1)
 	);
 
 	RCLCPP_INFO(node_->get_logger(), "Initialized!");
@@ -90,7 +65,42 @@ ArmMoveGroup::~ArmMoveGroup()
 }
 
 
-void ArmMoveGroup::arm_joint_space_cb_(zeroerr_msgs::msg::JointSpaceTarget::SharedPtr goal_msg)
+
+
+// void ArmMoveGroup::coll_obj_cb_(zeroerr_msgs::msg::CollisionObject::SharedPtr coll_obj_msg)
+void ArmMoveGroup::coll_obj_cb_(std_msgs::msg::Bool::SharedPtr coll_obj_msg)
+{
+	RCLCPP_INFO(node_->get_logger(), "Adding collision object!");
+
+	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+
+	//* Place table underneath arm
+	table_.header.frame_id = move_group.getPlanningFrame();
+
+	table_.id = "table1";
+
+	shape_msgs::msg::SolidPrimitive primitive;
+	primitive.type = primitive.BOX;
+	primitive.dimensions.resize(3);
+	primitive.dimensions[primitive.BOX_X] = 0.91;
+	primitive.dimensions[primitive.BOX_Y] = 1.54;
+	primitive.dimensions[primitive.BOX_Z] = 0.08;
+
+	geometry_msgs::msg::Pose table_pose;
+	table_pose.orientation.w = 1.0;
+	table_pose.position.x = 0.405;
+	table_pose.position.y = -0.67;
+	table_pose.position.z = -0.07;
+
+	table_.primitives.push_back(primitive);
+	table_.primitive_poses.push_back(table_pose);
+	table_.operation = table_.ADD;
+
+	planning_scene_interface_.applyCollisionObject(table_);
+}
+
+
+void ArmMoveGroup::joint_space_cb_(zeroerr_msgs::msg::JointSpaceTarget::SharedPtr goal_msg)
 {
 	RCLCPP_INFO(node_->get_logger(), "Joint space goal received.");
 	joint_space_goal_recv_ = true;
@@ -137,26 +147,28 @@ void ArmMoveGroup::pose_array_cb_(zeroerr_msgs::msg::PoseTargetArray::SharedPtr 
 
 	std::vector<geometry_msgs::msg::Pose> waypoints;
 
+	RCLCPP_INFO(node_->get_logger(), "Pose array receieved with %lu waypoints.", pose_array_msg->waypoints.size());
+
 	for (size_t i = 0; i < pose_array_msg->waypoints.size(); i++)
 		waypoints.push_back(pose_array_msg->waypoints[i]);
-
+	
 	moveit_msgs::msg::RobotTrajectory trajectory;
 	const double jump_threshold = 0.0;	// Disable jump threshold
-	const double eef_step = 0.01; 		// 1cm interpolation resolution
+	const double eef_step = 0.1; 		// 1cm interpolation resolution
 	double fraction = move_group.computeCartesianPath(waypoints, eef_step, jump_threshold, trajectory);
 
 	RCLCPP_INFO(node_->get_logger(), "Planning cartesian path (%.2f%% achieved)", fraction * 100.0);
 }
 
 
-void ArmMoveGroup::arm_pose_cb_(zeroerr_msgs::msg::PoseTarget::SharedPtr goal_msg)
+void ArmMoveGroup::pose_cb_(zeroerr_msgs::msg::PoseTarget::SharedPtr goal_msg)
 {
 	RCLCPP_INFO(node_->get_logger(), "Pose goal receieved.");
 	pose_goal_recv_ = true;
 
 	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
 
-	float vel_scaling_factor = goal_msg->speed / 100;
+	float vel_scaling_factor = (float) (goal_msg->speed / 100.0);
 	move_group.setMaxVelocityScalingFactor(vel_scaling_factor);
 	move_group.setMaxAccelerationScalingFactor(0.5);
 
@@ -171,7 +183,7 @@ void ArmMoveGroup::arm_pose_cb_(zeroerr_msgs::msg::PoseTarget::SharedPtr goal_ms
 }
 
 
-void ArmMoveGroup::arm_execute_cb_(const std_msgs::msg::Bool::SharedPtr execute_msg)
+void ArmMoveGroup::execute_cb_(const std_msgs::msg::Bool::SharedPtr execute_msg)
 {
 	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
 
@@ -193,7 +205,7 @@ void ArmMoveGroup::arm_execute_cb_(const std_msgs::msg::Bool::SharedPtr execute_
 }
 
 
-void ArmMoveGroup::arm_stop_cb_(const std_msgs::msg::Bool::SharedPtr stop_msg)
+void ArmMoveGroup::stop_cb_(const std_msgs::msg::Bool::SharedPtr stop_msg)
 {
 	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
 
@@ -207,7 +219,8 @@ void ArmMoveGroup::arm_stop_cb_(const std_msgs::msg::Bool::SharedPtr stop_msg)
 	pose_goal_recv_ = false;
 }
 
-void ArmMoveGroup::arm_clear_cb_(const std_msgs::msg::Bool::SharedPtr clear_msg)
+
+void ArmMoveGroup::clear_cb_(const std_msgs::msg::Bool::SharedPtr clear_msg)
 {
 	if (clear_msg->data)
 	{
@@ -247,6 +260,7 @@ void ArmMoveGroup::arm_clear_cb_(const std_msgs::msg::Bool::SharedPtr clear_msg)
 		}
 	}
 }
+
 
 void ArmMoveGroup::timer_cb_()
 {

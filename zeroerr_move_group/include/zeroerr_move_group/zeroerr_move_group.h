@@ -16,6 +16,7 @@
 
 #include <std_msgs/msg/bool.hpp>
 
+#include "zeroerr_msgs/msg/collision_object.hpp"
 #include "zeroerr_msgs/msg/joint_space_target.hpp"
 #include "zeroerr_msgs/msg/pose_target_array.hpp"
 #include "zeroerr_msgs/msg/pose_target.hpp"
@@ -44,20 +45,23 @@ class ArmMoveGroup
         bool joint_space_goal_recv_ = false;
         bool pose_goal_recv_ = false;
 
-        rclcpp::Subscription<zeroerr_msgs::msg::JointSpaceTarget>::SharedPtr arm_joint_space_sub_;
-        rclcpp::Subscription<zeroerr_msgs::msg::JointSpaceTarget>::SharedPtr pose_array_sub_;
-        rclcpp::Subscription<zeroerr_msgs::msg::PoseTarget>::SharedPtr arm_point_sub_;
+        // rclcpp::Subscription<zeroerr_msgs::msg::CollisionObject>::SharedPtr collision_obj_sub_;
+        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr collision_obj_sub_;
+        rclcpp::Subscription<zeroerr_msgs::msg::JointSpaceTarget>::SharedPtr joint_space_sub_;
+        rclcpp::Subscription<zeroerr_msgs::msg::PoseTargetArray>::SharedPtr pose_array_sub_;
+        rclcpp::Subscription<zeroerr_msgs::msg::PoseTarget>::SharedPtr pose_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_execute_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_stop_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_clear_sub_;
 
-
-        void arm_joint_space_cb_(zeroerr_msgs::msg::JointSpaceTarget::SharedPtr goal_msg);
+        // void coll_obj_cb_(const zeroerr_msgs::msg::CollisionObject::SharedPtr coll_obj_msg);
+        void coll_obj_cb_(const std_msgs::msg::Bool::SharedPtr coll_obj_msg);
+        void joint_space_cb_(zeroerr_msgs::msg::JointSpaceTarget::SharedPtr goal_msg);
         void pose_array_cb_(zeroerr_msgs::msg::PoseTargetArray::SharedPtr pose_array_msg);
-        void arm_pose_cb_(zeroerr_msgs::msg::PoseTarget::SharedPtr goal_msg);
-        void arm_execute_cb_(const std_msgs::msg::Bool::SharedPtr execute_msg);
-        void arm_stop_cb_(const std_msgs::msg::Bool::SharedPtr stop_msg);
-        void arm_clear_cb_(const std_msgs::msg::Bool::SharedPtr clear_msg);
+        void pose_cb_(zeroerr_msgs::msg::PoseTarget::SharedPtr goal_msg);
+        void execute_cb_(const std_msgs::msg::Bool::SharedPtr execute_msg);
+        void stop_cb_(const std_msgs::msg::Bool::SharedPtr stop_msg);
+        void clear_cb_(const std_msgs::msg::Bool::SharedPtr clear_msg);
         void timer_cb_();
 
         zeroerr_msgs::msg::JointSpaceTarget arm_joint_space_cmd_;

@@ -1,19 +1,44 @@
 import time
+import copy
+import numpy as np
 import rclpy
 from rclpy.node import Node
 
 from std_msgs.msg import Bool
-from zeroerr_msgs.msg import JointSpaceTarget, PoseTarget
+from geometry_msgs.msg import Pose
+from zeroerr_msgs.msg import CollisionObject
+from zeroerr_msgs.msg import JointSpaceTarget
+from zeroerr_msgs.msg import PoseTargetArray
+from zeroerr_msgs.msg import PoseTarget
 
 class MoveGroupTest(Node):
 
     def __init__(self):
         super().__init__('move_group_test')
         
+        # Collision Object publisher
+        # self.collision_obj_pub_ = self.create_publisher(
+        #     CollisionObject,
+        #     "arm/CollisionObject",
+        #     1
+        # )
+        self.collision_obj_pub_ = self.create_publisher(
+            Bool,
+            "arm/SetupLabEnvironment",
+            1
+        )
+
         # JointSpaceTarget publisher
         self.joint_space_target_pub_ = self.create_publisher(
             JointSpaceTarget,
             "arm/JointSpaceGoal",
+            10
+        )
+
+        # PoseTargetArray publisher
+        self.pose_array_pub_ = self.create_publisher(
+            PoseTargetArray,
+            "arm/PoseGoalArray",
             10
         )
 
@@ -56,7 +81,9 @@ class MoveGroupTest(Node):
         print("""\nEnter number corresponding to an action:
             '1': Basic move test
             '2': Stop test
+            '3': Pose array test
             'h': Home test
+            'c': Setup lab environment
             """)
         test_no = input()
 
@@ -64,8 +91,12 @@ class MoveGroupTest(Node):
             self.basic_move_test_()
         elif test_no == '2':
             self.stop_test_()
+        elif test_no == '3':
+            self.pose_array_test_()
         elif test_no == 'h':
             self.home_test_()
+        elif test_no == 'c':
+            self.collision_object_test_()
 
 
     def basic_move_test_(self):
@@ -89,8 +120,6 @@ class MoveGroupTest(Node):
         else:
             self.get_logger().info("Execution cancelled, clearing target.")
             self.clear_pub_.publish(msg)
-
-
 
 
     def stop_test_(self):
@@ -178,7 +207,6 @@ class MoveGroupTest(Node):
             return
 
 
-
     def home_test_(self):
         self.get_logger().info('Homing!')
 
@@ -202,6 +230,84 @@ class MoveGroupTest(Node):
         else:
             self.get_logger().info("Execution cancelled, clearing target.")
             self.clear_pub_.publish(msg)
+
+
+    def pose_array_test_(self):
+
+        msg = Bool()
+        msg.data = True
+
+        pta = PoseTargetArray()
+        pta.speed_factor = 25
+
+        waypoint = Pose()
+        waypoint.orientation.w = 1.0
+        waypoint.orientation.x = 0.0
+        waypoint.orientation.y = 0.0
+        waypoint.orientation.z = 0.0
+        waypoint.position.x = 0.14437
+        waypoint.position.y = 0.081665
+        waypoint.position.z = 0.77396
+
+        # pt = PoseTarget()
+        # pt.speed = 60
+        # pt.pose = waypoint
+
+        # self.get_logger().info("Moving to starting point")
+
+        # self.pose_target_pub_.publish(pt)
+        # self.execute_pub_.publish(msg)
+
+        # time.sleep(10)
+
+
+        #* Rectangle
+        # waypoint.position.x += 0.05
+        # waypoint_to_add = copy.deepcopy(waypoint)
+        # pta.waypoints.append(waypoint_to_add)
+
+        # waypoint.position.z += 0.05
+        # waypoint_to_add = copy.deepcopy(waypoint)
+        # pta.waypoints.append(waypoint_to_add)
+
+        # waypoint.position.x -= 0.05
+        # waypoint_to_add = copy.deepcopy(waypoint)
+        # pta.waypoints.append(waypoint_to_add)
+
+        # waypoint.position.z -= 0.05
+        # waypoint_to_add = copy.deepcopy(waypoint)
+        # pta.waypoints.append(waypoint_to_add)
+
+
+        #* Circle
+        radius = 0.1
+        for angle in np.arange(0, 2*np.pi, 0.1):
+            waypoint.position.x = 0.14437
+            waypoint.position.y = 0.081665
+            waypoint.position.z = 0.77396
+            waypoint.position.x += float(radius*(np.cos(angle) - 1))
+            waypoint.position.z += float(radius*(np.sin(angle)))
+
+            print(f"({waypoint.position.x}, {waypoint.position.z})")
+
+            waypoint_to_add = copy.deepcopy(waypoint)
+            pta.waypoints.append(waypoint_to_add)
+
+
+
+        self.pose_array_pub_.publish(pta)
+
+
+    def collision_object_test_(self):
+        self.get_logger().info("Adding collision object!")
+
+        msg = Bool()
+        msg.data = True
+        self.collision_obj_pub_.publish(msg)
+
+        # TODO: Collision object support (Adds lab table for now)
+
+
 
 
 def main(args=None):
