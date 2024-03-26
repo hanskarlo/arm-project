@@ -1,6 +1,7 @@
 import time
 import copy
 import numpy as np
+from psutil import wait_procs
 import rclpy
 from rclpy.node import Node
 
@@ -249,50 +250,69 @@ class MoveGroupTest(Node):
         waypoint.position.y = 0.081665
         waypoint.position.z = 0.77396
 
-        # pt = PoseTarget()
-        # pt.speed = 60
-        # pt.pose = waypoint
+        #* Go to start pose
+        pt = PoseTarget()
+        pt.speed = 30
+        pt.pose = waypoint
 
-        # self.get_logger().info("Moving to starting point")
+        self.get_logger().info("Moving to starting point")
 
-        # self.pose_target_pub_.publish(pt)
-        # self.execute_pub_.publish(msg)
+        self.pose_target_pub_.publish(pt)
+        self.execute_pub_.publish(msg)
 
-        # time.sleep(10)
+        time.sleep(20)
 
 
         #* Rectangle
-        # waypoint.position.x += 0.05
-        # waypoint_to_add = copy.deepcopy(waypoint)
-        # pta.waypoints.append(waypoint_to_add)
+        waypoint.position.x += 0.05
+        waypoint_to_add = copy.deepcopy(waypoint)
+        pta.waypoints.append(waypoint_to_add)
 
-        # waypoint.position.z += 0.05
-        # waypoint_to_add = copy.deepcopy(waypoint)
-        # pta.waypoints.append(waypoint_to_add)
+        waypoint.position.z += 0.05
+        waypoint_to_add = copy.deepcopy(waypoint)
+        pta.waypoints.append(waypoint_to_add)
 
-        # waypoint.position.x -= 0.05
-        # waypoint_to_add = copy.deepcopy(waypoint)
-        # pta.waypoints.append(waypoint_to_add)
+        waypoint.position.x -= 0.05
+        waypoint_to_add = copy.deepcopy(waypoint)
+        pta.waypoints.append(waypoint_to_add)
 
-        # waypoint.position.z -= 0.05
-        # waypoint_to_add = copy.deepcopy(waypoint)
-        # pta.waypoints.append(waypoint_to_add)
+        waypoint.position.z -= 0.05
+        waypoint_to_add = copy.deepcopy(waypoint)
+        pta.waypoints.append(waypoint_to_add)
 
 
         #* Circle
-        radius = 0.1
-        for angle in np.arange(0, 2*np.pi, 0.1):
-            waypoint.position.x = 0.14437
-            waypoint.position.y = 0.081665
-            waypoint.position.z = 0.77396
-            waypoint.position.x += float(radius*(np.cos(angle) - 1))
-            waypoint.position.z += float(radius*(np.sin(angle)))
+        # radius = 0.1
+        # waypoint_num = 25
+        # pta.step_size = 0.001
+        # pta.jump_threshold = 0.0
+        # arc_length = radius * (np.pi/waypoint_num)
+        # x_steps = np.linspace(0, 2*radius, 10)
+        # for angle in np.linspace(0, np.pi, waypoint_num + 1):
+        #     waypoint.position.x = 0.14437
+        #     waypoint.position.y = 0.081665
+        #     waypoint.position.z = 0.77396
+        #     waypoint.position.x += float(radius*(np.cos(angle) - 1))
+        #     waypoint.position.z += float(radius*(np.sin(angle)))
 
-            print(f"({waypoint.position.x}, {waypoint.position.z})")
+        #     print(f"({waypoint.position.x}, {waypoint.position.z})")
 
-            waypoint_to_add = copy.deepcopy(waypoint)
-            pta.waypoints.append(waypoint_to_add)
+        #     waypoint_to_add = copy.deepcopy(waypoint)
+        #     pta.waypoints.append(waypoint_to_add)
+    
+        
+        # center = Pose()
+        # center.position.x = waypoint.position.x - radius
+        # center.position.y = waypoint.position.y
+        # center.position.z = waypoint.position.z 
+        # pta.waypoints.append(center)
 
+        # endpoint = Pose()
+        # endpoint.position.x = waypoint.position.x - radius
+        # endpoint.position.y = waypoint.position.y
+        # endpoint.position.z = waypoint.position.z + radius
+        # pta.waypoints.append(endpoint)
+        # pta.speed_factor = 5
 
 
         self.pose_array_pub_.publish(pta)

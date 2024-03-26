@@ -147,17 +147,53 @@ void ArmMoveGroup::pose_array_cb_(zeroerr_msgs::msg::PoseTargetArray::SharedPtr 
 
 	std::vector<geometry_msgs::msg::Pose> waypoints;
 
-	RCLCPP_INFO(node_->get_logger(), "Pose array receieved with %lu waypoints.", pose_array_msg->waypoints.size());
+	// RCLCPP_INFO(node_->get_logger(), "Pose array receieved with %lu waypoints.", pose_array_msg->waypoints.size());
+	move_group.setMaxVelocityScalingFactor(0.1);
 
 	for (size_t i = 0; i < pose_array_msg->waypoints.size(); i++)
 		waypoints.push_back(pose_array_msg->waypoints[i]);
 	
 	moveit_msgs::msg::RobotTrajectory trajectory;
-	const double jump_threshold = 0.0;	// Disable jump threshold
-	const double eef_step = 0.1; 		// 1cm interpolation resolution
+	// const double jump_threshold = 0.0;	// Disable jump threshold
+	// const double eef_step = 0.01; 		// 1cm interpolation resolution
+	const double jump_threshold = pose_array_msg->jump_threshold;
+	const double eef_step = pose_array_msg->step_size;
 	double fraction = move_group.computeCartesianPath(waypoints, eef_step, jump_threshold, trajectory);
 
 	RCLCPP_INFO(node_->get_logger(), "Planning cartesian path (%.2f%% achieved)", fraction * 100.0);
+
+	// move_group.setPlanningPipelineId("pilz_industrial_motion_planner");
+	// move_group.setPlannerId("CIRC");
+
+	// geometry_msgs::msg::PoseStamped center;
+	// geometry_msgs::msg::PoseStamped endpoint;
+
+	// center.pose = pose_array_msg->waypoints[0];
+	// center.header.frame_id = "base_link";
+	// endpoint.pose = pose_array_msg->waypoints[1];
+	// endpoint.header.frame_id = "base_link";
+
+	// move_group.setPoseTarget(endpoint);
+	
+	
+
+	// moveit_msgs::msg::Constraints constraints;
+	// moveit_msgs::msg::PositionConstraint pos_constraint;
+	// constraints.name = "center";
+	// pos_constraint.header.frame_id = center.header.frame_id;
+    // pos_constraint.link_name = "j6_Link";
+    // pos_constraint.constraint_region.primitive_poses.push_back(center.pose);
+    // pos_constraint.weight = 1.0;
+    // constraints.position_constraints.push_back(pos_constraint);
+    // move_group.setPathConstraints(constraints);
+
+	// bool success = (move_group.plan(plan_) == moveit::core::MoveItErrorCode::SUCCESS);
+
+	// if (success)
+	// 	RCLCPP_INFO(node_->get_logger(), "Motion plan successful!\n");
+	// else
+	// 	RCLCPP_ERROR(node_->get_logger(), "Motion plan failed\n");
+
 }
 
 

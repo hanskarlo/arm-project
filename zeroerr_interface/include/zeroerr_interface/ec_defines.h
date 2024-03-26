@@ -11,6 +11,8 @@
 #include <time.h>
 #include <string.h>
 
+// #include "realtime_tools/thread_priority.hpp"
+
 #define NUM_JOINTS 6
 
 // #define EROB_70H100_MAX_SPEED   262144 // counts/s

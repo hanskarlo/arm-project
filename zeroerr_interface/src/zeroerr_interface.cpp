@@ -44,7 +44,7 @@ ZeroErrInterface::ZeroErrInterface() : Node("zeroerr_interface")
         JOINT_STATE_PERIOD,
         std::bind(&ZeroErrInterface::joint_state_pub_, this));
     
-    // clock_gettime(CLOCK_TO_USE, &wakeupTime);
+    clock_gettime(CLOCK_TO_USE, &wakeupTime);
 }
 
 
@@ -209,7 +209,6 @@ bool ZeroErrInterface::set_drive_parameters_()
 
         // Set max velocity
         uint32_t max_velocity = (i < 3) ? EROB_110H120_MAX_SPEED : EROB_70H100_MAX_SPEED;
-        // udint = 1000;
         if (ecrt_master_sdo_download(
                 master,
                 i,
@@ -553,12 +552,12 @@ bool ZeroErrInterface::set_drive_parameters_()
 
 
         // Setup DC-Synchronization 
-        // ecrt_slave_config_dc(
-        //     joint_slave_configs[i], 
-        //     ASSIGN_ACTIVATE, 
-        //     SYNC0_CYCLE, 
-        //     SYNC0_SHIFT, 
-        //     0, 0);
+        ecrt_slave_config_dc(
+            joint_slave_configs[i], 
+            ASSIGN_ACTIVATE, 
+            SYNC0_CYCLE, 
+            SYNC0_SHIFT, 
+            0, 0);
     
     }
 
@@ -740,6 +739,10 @@ struct timespec timespec_add(struct timespec time1, struct timespec time2)
  */
 void ZeroErrInterface::cyclic_pdo_loop_()
 {
+    ecrt_master_application_time(master, TIMESPEC2NS(wakeupTime));
+    wakeupTime = timespec_add(wakeupTime, cycletime);
+    // clock_nanosleep(CLOCK_TO_USE, TIMER_ABSTIME, &wakeupTime, NULL);
+
     // loop_start_time_ = (unsigned long) this->now().nanoseconds();
     
     // latency_ns_ = loop_start_time_ - wakeup_time_;
@@ -913,18 +916,18 @@ void ZeroErrInterface::cyclic_pdo_loop_()
     // ecrt_master_application_time(master, TIMESPEC2NS(t));
     // ecrt_master_application_time(master, TIMESPEC2NS(wakeupTime));
 
-    // if (sync_ref_counter)
-    // {
-    //     sync_ref_counter--;
-    // }
-    // else
-    // {
-    //     sync_ref_counter = 1;
-    //     clock_gettime(CLOCK_TO_USE, &time_ns);
-    //     ecrt_master_sync_reference_clock_to(master, TIMESPEC2NS(time_ns));
-    // }
+    if (sync_ref_counter)
+    {
+        sync_ref_counter--;
+    }
+    else
+    {
+        sync_ref_counter = 1;
+        clock_gettime(CLOCK_REALTIME, &time_ns);
+        ecrt_master_sync_reference_clock_to(master, TIMESPEC2NS(time_ns));
+    }
     // ecrt_master_sync_reference_clock(master);
-    // ecrt_master_sync_slave_clocks(master);
+    ecrt_master_sync_slave_clocks(master);
 
     // send process data
     ecrt_domain_queue(domain);
@@ -1057,6 +1060,14 @@ int main(int argc, char **argv)
     rclcpp::init(argc, argv);
 
     auto node = std::make_shared<ZeroErrInterface>();
+
+    //* Set priority
+    struct sched_param param = {};
+    param.sched_priority = sched_get_priority_max(SCHED_FIFO);
+    RCLCPP_INFO(node->get_logger(), "Using priority %i.\n", param.sched_priority);
+    if (sched_setscheduler(0, SCHED_FIFO, &param) == -1) {
+        RCLCPP_ERROR(node->get_logger(), "sched_setscheduler failed\n");
+    }
 
     rclcpp::spin(node);
 
