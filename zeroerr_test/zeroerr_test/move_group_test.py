@@ -1,3 +1,4 @@
+
 import time
 import copy
 import numpy as np
@@ -82,7 +83,8 @@ class MoveGroupTest(Node):
         print("""\nEnter number corresponding to an action:
             '1': Basic move test
             '2': Stop test
-            '3': Pose array test
+            '3': Linear movement test
+            '4': Arc test
             'h': Home test
             'c': Setup lab environment
             """)
@@ -93,7 +95,9 @@ class MoveGroupTest(Node):
         elif test_no == '2':
             self.stop_test_()
         elif test_no == '3':
-            self.pose_array_test_()
+            self.linear_test_()
+        elif test_no == '4':
+            self.arc_test_()
         elif test_no == 'h':
             self.home_test_()
         elif test_no == 'c':
@@ -142,7 +146,10 @@ class MoveGroupTest(Node):
                 
                 self.get_logger().info(f"Moving J{i} 90° at {jst.speed}% speed")
 
-                jst.joint_deg[i] = 90
+                if i < 4:
+                    jst.joint_deg = 90
+                else:
+                    jst.joint_deg = 180
                 self.joint_space_target_pub_.publish(jst)
 
                 if input("Execute (y/n)? ").lower() == "y":
@@ -233,90 +240,192 @@ class MoveGroupTest(Node):
             self.clear_pub_.publish(msg)
 
 
-    def pose_array_test_(self):
+    def linear_test_(self):
+
+        msg = Bool()
+        msg.data = True
+
+        start_pose = Pose()
+        start_pose.orientation.w = 1.0
+        start_pose.orientation.x = 0.0
+        start_pose.orientation.y = 0.0
+        start_pose.orientation.z = 0.0
+        start_pose.position.x = 0.14437
+        start_pose.position.y = 0.081665
+        start_pose.position.z = 0.77396
+
+        #* Go to start pose
+        # pt = PoseTarget()
+        # pt.speed = 45
+        # pt.pose = start_pose
+
+        # self.get_logger().info("Moving to starting point")
+
+        # self.pose_target_pub_.publish(pt)
+        # self.execute_pub_.publish(msg)
+
+        # time.sleep(10)
+
+        # if (input("Start rectangle in xz plane (y/n)?").lower() == 'y'):
+
+        #     #* Rectangle in xz plane
+        #     pta = PoseTargetArray()
+        #     pta.type = "linear"
+        #     pta.step_size = 0.01     # 1cm step size interpolation
+        #     pta.jump_threshold = 0.0 # Disabled
+        #     start_pose.position.x += 0.2
+        #     waypoint_to_add = copy.deepcopy(start_pose)
+        #     pta.waypoints.append(waypoint_to_add)
+
+        #     start_pose.position.z += 0.15
+        #     waypoint_to_add = copy.deepcopy(start_pose)
+        #     pta.waypoints.append(waypoint_to_add)
+
+        #     start_pose.position.x -= 0.3
+        #     waypoint_to_add = copy.deepcopy(start_pose)
+        #     pta.waypoints.append(waypoint_to_add)
+
+        #     start_pose.position.z -= 0.15
+        #     waypoint_to_add = copy.deepcopy(start_pose)
+        #     pta.waypoints.append(waypoint_to_add)
+
+
+        #     self.pose_array_pub_.publish(pta)
+
+        #     if input("Execute (y/n)?").lower() == 'y':
+        #         self.execute_pub_.publish(msg)
+        #     else:
+        #         self.clear_pub_.publish(msg)
+        #         return
+        
+        # else:
+        #     self.clear_pub_.publish(msg)
+        #     return
+        
+        # if (input("Bring arm home (y/n)?").lower() == 'y'):
+        #     self.home_test_()
+        # else:
+        #     return
+
+        if (input("Start rectangle in yz plane (y/n)?").lower() == 'y'):
+            
+            #* New start pos in yz plane
+            start_pose.orientation.x = -0.00040959042962640524
+            start_pose.orientation.y = -0.00035000048228539526
+            start_pose.orientation.z = -0.7071999907493591
+            start_pose.orientation.w = 0.7070133686065674
+            start_pose.position.x = 0.38288721442222595
+            start_pose.position.y = -0.20574696362018585
+            start_pose.position.z = 0.7797312140464783
+
+            pt = PoseTarget()
+            pt.speed = 45
+            pt.pose = start_pose
+
+            self.get_logger().info("Moving to starting point")
+            self.pose_target_pub_.publish(pt)
+            self.execute_pub_.publish(msg)
+            time.sleep(15)
+
+            #* Rectangle (10cm x 10cm) in xz plane
+            pta = PoseTargetArray()
+            pta.type = "linear"
+            pta.step_size = 0.01     # 1cm step size interpolation
+            pta.jump_threshold = 0.0 # Disabled
+
+            start_pose.position.x -= 0.1
+            waypoint_to_add = copy.deepcopy(start_pose)
+            pta.waypoints.append(waypoint_to_add)
+
+            start_pose.position.y -= 0.1
+            waypoint_to_add = copy.deepcopy(start_pose)
+            pta.waypoints.append(waypoint_to_add)
+
+            start_pose.position.x += 0.1
+            waypoint_to_add = copy.deepcopy(start_pose)
+            pta.waypoints.append(waypoint_to_add)
+
+            start_pose.position.y -= 0.1
+            waypoint_to_add = copy.deepcopy(start_pose)
+            pta.waypoints.append(waypoint_to_add)
+
+            start_pose.position.x -= 0.1
+            waypoint_to_add = copy.deepcopy(start_pose)
+            pta.waypoints.append(waypoint_to_add)
+
+            start_pose.position.y -= 0.1
+            waypoint_to_add = copy.deepcopy(start_pose)
+            pta.waypoints.append(waypoint_to_add)
+
+            start_pose.position.x += 0.1
+            waypoint_to_add = copy.deepcopy(start_pose)
+            pta.waypoints.append(waypoint_to_add)
+
+            start_pose.position.y -= 0.4
+            waypoint_to_add = copy.deepcopy(start_pose)
+            pta.waypoints.append(waypoint_to_add)
+
+            self.pose_array_pub_.publish(pta)
+
+
+            if input("Execute (y/n)?").lower() == 'y':
+                self.execute_pub_.publish(msg)
+            else:
+                self.clear_pub_.publish(msg)
+                return
+        
+        else:
+            self.clear_pub_.publish(msg)
+            return
+
+    
+
+    def arc_test_(self):
 
         msg = Bool()
         msg.data = True
 
         pta = PoseTargetArray()
-        pta.speed_factor = 25
+        pta.type = "arc"
+        pta.speed_factor = 10
 
-        waypoint = Pose()
-        waypoint.orientation.w = 1.0
-        waypoint.orientation.x = 0.0
-        waypoint.orientation.y = 0.0
-        waypoint.orientation.z = 0.0
-        waypoint.position.x = 0.14437
-        waypoint.position.y = 0.081665
-        waypoint.position.z = 0.77396
+        start_pose = Pose()
+        start_pose.orientation.w = 1.0
+        start_pose.orientation.x = 0.0
+        start_pose.orientation.y = 0.0
+        start_pose.orientation.z = 0.0
+        start_pose.position.x = 0.14437
+        start_pose.position.y = 0.081665
+        start_pose.position.z = 0.77396
 
         #* Go to start pose
         pt = PoseTarget()
-        pt.speed = 30
-        pt.pose = waypoint
+        pt.speed = 45
+        pt.pose = start_pose
 
         self.get_logger().info("Moving to starting point")
 
         self.pose_target_pub_.publish(pt)
         self.execute_pub_.publish(msg)
 
-        time.sleep(20)
+        time.sleep(15)
 
+        #* Quarter-circle arc
+        radius = 0.1
+        center = Pose()
+        center.position.x = start_pose.position.x - radius
+        center.position.y = start_pose.position.y
+        center.position.z = start_pose.position.z 
+        pta.waypoints.append(center)
 
-        #* Rectangle
-        waypoint.position.x += 0.05
-        waypoint_to_add = copy.deepcopy(waypoint)
-        pta.waypoints.append(waypoint_to_add)
-
-        waypoint.position.z += 0.05
-        waypoint_to_add = copy.deepcopy(waypoint)
-        pta.waypoints.append(waypoint_to_add)
-
-        waypoint.position.x -= 0.05
-        waypoint_to_add = copy.deepcopy(waypoint)
-        pta.waypoints.append(waypoint_to_add)
-
-        waypoint.position.z -= 0.05
-        waypoint_to_add = copy.deepcopy(waypoint)
-        pta.waypoints.append(waypoint_to_add)
-
-
-        #* Circle
-        # radius = 0.1
-        # waypoint_num = 25
-        # pta.step_size = 0.001
-        # pta.jump_threshold = 0.0
-        # arc_length = radius * (np.pi/waypoint_num)
-        # x_steps = np.linspace(0, 2*radius, 10)
-        # for angle in np.linspace(0, np.pi, waypoint_num + 1):
-        #     waypoint.position.x = 0.14437
-        #     waypoint.position.y = 0.081665
-        #     waypoint.position.z = 0.77396
-        #     waypoint.position.x += float(radius*(np.cos(angle) - 1))
-        #     waypoint.position.z += float(radius*(np.sin(angle)))
-
-        #     print(f"({waypoint.position.x}, {waypoint.position.z})")
-
-        #     waypoint_to_add = copy.deepcopy(waypoint)
-        #     pta.waypoints.append(waypoint_to_add)
-    
-        
-        # center = Pose()
-        # center.position.x = waypoint.position.x - radius
-        # center.position.y = waypoint.position.y
-        # center.position.z = waypoint.position.z 
-        # pta.waypoints.append(center)
-
-        # endpoint = Pose()
-        # endpoint.position.x = waypoint.position.x - radius
-        # endpoint.position.y = waypoint.position.y
-        # endpoint.position.z = waypoint.position.z + radius
-        # pta.waypoints.append(endpoint)
-        # pta.speed_factor = 5
-
+        endpoint = Pose()
+        endpoint.position.x = start_pose.position.x - radius
+        endpoint.position.y = start_pose.position.y
+        endpoint.position.z = start_pose.position.z + radius
+        pta.waypoints.append(endpoint)
+        pta.speed_factor = 5
 
         self.pose_array_pub_.publish(pta)
-
 
     def collision_object_test_(self):
         self.get_logger().info("Adding collision object!")

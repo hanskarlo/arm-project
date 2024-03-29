@@ -104,15 +104,14 @@ void ArmMoveGroup::joint_space_cb_(zeroerr_msgs::msg::JointSpaceTarget::SharedPt
 {
 	RCLCPP_INFO(node_->get_logger(), "Joint space goal received.");
 	joint_space_goal_recv_ = true;
+	linear_trajectory_recv_ = false;
+	pose_goal_recv_ = false;
 
-	float vel_scaling_factor = (float) (goal_msg->speed / 100.0);
-	// RCLCPP_INFO(node_->get_logger(), "Velocity scaling factor: %f(%u/100)", vel_scaling_factor, goal_msg->speed);
-	
 	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
-	move_group.setMaxVelocityScalingFactor(vel_scaling_factor);
-	move_group.setMaxAccelerationScalingFactor(0.5);
+	move_group.startStateMonitor();
 
 	moveit::core::RobotStatePtr current_state = move_group.getCurrentState();
+	move_group.setStartState(*current_state);
 
 	const moveit::core::JointModelGroup* joint_model_group =
       move_group.getCurrentState()->getJointModelGroup(PLANNING_GROUP);
@@ -123,6 +122,13 @@ void ArmMoveGroup::joint_space_cb_(zeroerr_msgs::msg::JointSpaceTarget::SharedPt
 	for (uint i = 0; i < NUM_JOINTS; i++)
 		joint_group_positions[i] = ((goal_msg->joint_deg[i] * PI) / 180); // Deg -> Rad
 	// RCLCPP_INFO(node_->get_logger(), "Converted deg to rad!\n");
+
+
+	float vel_scaling_factor = (float) (goal_msg->speed / 100.0);
+	move_group.setMaxVelocityScalingFactor(vel_scaling_factor);
+	move_group.setMaxAccelerationScalingFactor(0.5);
+	// RCLCPP_INFO(node_->get_logger(), "Velocity scaling factor: %f(%u/100)", vel_scaling_factor, goal_msg->speed);
+
 
 	bool within_bounds = move_group.setJointValueTarget(joint_group_positions);
 	if (!within_bounds)
@@ -144,55 +150,81 @@ void ArmMoveGroup::joint_space_cb_(zeroerr_msgs::msg::JointSpaceTarget::SharedPt
 void ArmMoveGroup::pose_array_cb_(zeroerr_msgs::msg::PoseTargetArray::SharedPtr pose_array_msg)
 {
 	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
-
-	std::vector<geometry_msgs::msg::Pose> waypoints;
-
-	// RCLCPP_INFO(node_->get_logger(), "Pose array receieved with %lu waypoints.", pose_array_msg->waypoints.size());
-	move_group.setMaxVelocityScalingFactor(0.1);
-
-	for (size_t i = 0; i < pose_array_msg->waypoints.size(); i++)
-		waypoints.push_back(pose_array_msg->waypoints[i]);
 	
-	moveit_msgs::msg::RobotTrajectory trajectory;
-	// const double jump_threshold = 0.0;	// Disable jump threshold
-	// const double eef_step = 0.01; 		// 1cm interpolation resolution
-	const double jump_threshold = pose_array_msg->jump_threshold;
-	const double eef_step = pose_array_msg->step_size;
-	double fraction = move_group.computeCartesianPath(waypoints, eef_step, jump_threshold, trajectory);
+	move_group.startStateMonitor();
+	moveit::core::RobotStatePtr current_state = move_group.getCurrentState();
+	moveit::core::RobotState start_state(*move_group.getCurrentState());
+	move_group.setStartState(start_state);
 
-	RCLCPP_INFO(node_->get_logger(), "Planning cartesian path (%.2f%% achieved)", fraction * 100.0);
+	const moveit::core::JointModelGroup* joint_model_group =
+      move_group.getCurrentState()->getJointModelGroup(PLANNING_GROUP);
 
-	// move_group.setPlanningPipelineId("pilz_industrial_motion_planner");
-	// move_group.setPlannerId("CIRC");
+	std::vector<double> joint_group_positions;
+	current_state->copyJointGroupPositions(joint_model_group, joint_group_positions);
 
-	// geometry_msgs::msg::PoseStamped center;
-	// geometry_msgs::msg::PoseStamped endpoint;
+	for (uint i = 0; i < NUM_JOINTS; i++)
+		RCLCPP_INFO(node_->get_logger(), "Current J%d angle: %f", i + 1, joint_group_positions[i]);
 
-	// center.pose = pose_array_msg->waypoints[0];
-	// center.header.frame_id = "base_link";
-	// endpoint.pose = pose_array_msg->waypoints[1];
-	// endpoint.header.frame_id = "base_link";
+	const std::string type = pose_array_msg->type;
+	if (!strcmp(type.c_str(), "linear"))
+	{
+		linear_trajectory_recv_ = true;
 
-	// move_group.setPoseTarget(endpoint);
-	
-	
+		std::vector<geometry_msgs::msg::Pose> waypoints;
+		// waypoints.push_back(move_group.getCurrentPose().pose);
 
-	// moveit_msgs::msg::Constraints constraints;
-	// moveit_msgs::msg::PositionConstraint pos_constraint;
-	// constraints.name = "center";
-	// pos_constraint.header.frame_id = center.header.frame_id;
-    // pos_constraint.link_name = "j6_Link";
-    // pos_constraint.constraint_region.primitive_poses.push_back(center.pose);
-    // pos_constraint.weight = 1.0;
-    // constraints.position_constraints.push_back(pos_constraint);
-    // move_group.setPathConstraints(constraints);
+		RCLCPP_INFO(node_->get_logger(), "Pose array receieved with %lu waypoints.", pose_array_msg->waypoints.size());
+		// move_group.setMaxVelocityScalingFactor(0.1);
 
-	// bool success = (move_group.plan(plan_) == moveit::core::MoveItErrorCode::SUCCESS);
+		for (size_t i = 0; i < pose_array_msg->waypoints.size(); i++)
+			waypoints.push_back(pose_array_msg->waypoints[i]);
+		
+		// moveit_msgs::msg::RobotTrajectory trajectory;
+		// const double jump_threshold = 0.0;	// Disable jump threshold
+		// const double eef_step = 0.01; 		// 1cm interpolation resolution
+		const double jump_threshold = pose_array_msg->jump_threshold;
+		const double eef_step = pose_array_msg->step_size;
+		double fraction = move_group.computeCartesianPath(waypoints, eef_step, jump_threshold, trajectory_);
 
-	// if (success)
-	// 	RCLCPP_INFO(node_->get_logger(), "Motion plan successful!\n");
-	// else
-	// 	RCLCPP_ERROR(node_->get_logger(), "Motion plan failed\n");
+		RCLCPP_INFO(node_->get_logger(), "Planning cartesian path (%.2f%% achieved)", fraction * 100.0);
+	}
+	else if(!strcmp(type.c_str(), "arc"))
+	{
+		move_group.setPlanningPipelineId("pilz_industrial_motion_planner");
+		move_group.setPlannerId("CIRC");
+
+
+		geometry_msgs::msg::PoseStamped center;
+		geometry_msgs::msg::PoseStamped endpoint;
+
+		center.pose = pose_array_msg->waypoints[0];
+		center.header.frame_id = "base_link";
+		endpoint.pose = pose_array_msg->waypoints[1];
+		endpoint.header.frame_id = "base_link";
+
+
+		move_group.setPoseTarget(endpoint);
+		
+
+		moveit_msgs::msg::Constraints constraints;
+		moveit_msgs::msg::PositionConstraint pos_constraint;
+		constraints.name = "center";
+		pos_constraint.header.frame_id = center.header.frame_id;
+		pos_constraint.link_name = "j6_Link";
+		pos_constraint.constraint_region.primitive_poses.push_back(center.pose);
+		pos_constraint.weight = 1.0;
+		constraints.position_constraints.push_back(pos_constraint);
+		move_group.setPathConstraints(constraints);
+
+		bool success = (move_group.plan(plan_) == moveit::core::MoveItErrorCode::SUCCESS);
+
+		if (success)
+			RCLCPP_INFO(node_->get_logger(), "Motion plan successful!\n");
+		else
+			RCLCPP_ERROR(node_->get_logger(), "Motion plan failed\n");
+
+		move_group.clearPathConstraints();
+	}
 
 }
 
@@ -201,8 +233,26 @@ void ArmMoveGroup::pose_cb_(zeroerr_msgs::msg::PoseTarget::SharedPtr goal_msg)
 {
 	RCLCPP_INFO(node_->get_logger(), "Pose goal receieved.");
 	pose_goal_recv_ = true;
+	linear_trajectory_recv_ = false;
+	joint_space_goal_recv_ = false;
+
 
 	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+
+	move_group.startStateMonitor();
+	moveit::core::RobotStatePtr current_state = move_group.getCurrentState();
+	moveit::core::RobotState start_state(*move_group.getCurrentState());
+	move_group.setStartState(start_state);
+
+	const moveit::core::JointModelGroup* joint_model_group =
+      move_group.getCurrentState()->getJointModelGroup(PLANNING_GROUP);
+
+	std::vector<double> joint_group_positions;
+	current_state->copyJointGroupPositions(joint_model_group, joint_group_positions);
+
+	for (uint i = 0; i < NUM_JOINTS; i++)
+		RCLCPP_INFO(node_->get_logger(), "Current J%d angle: %f", i + 1, joint_group_positions[i]);
+
 
 	float vel_scaling_factor = (float) (goal_msg->speed / 100.0);
 	move_group.setMaxVelocityScalingFactor(vel_scaling_factor);
@@ -225,10 +275,20 @@ void ArmMoveGroup::execute_cb_(const std_msgs::msg::Bool::SharedPtr execute_msg)
 
 	if (execute_msg->data)
 	{
-		if (move_group.asyncExecute(plan_) == moveit::core::MoveItErrorCode::SUCCESS)
-			RCLCPP_INFO(node_->get_logger(), "Motion plan executed!\n");
+		if (linear_trajectory_recv_)
+		{
+			if (move_group.asyncExecute(trajectory_) == moveit::core::MoveItErrorCode::SUCCESS)
+				RCLCPP_INFO(node_->get_logger(), "Linear trajectory motion plan executed!\n");
+			else
+				RCLCPP_ERROR(node_->get_logger(), "Motion execution failed\n");
+		}
 		else
-			RCLCPP_ERROR(node_->get_logger(), "Motion execution failed\n");
+		{
+			if (move_group.asyncExecute(plan_) == moveit::core::MoveItErrorCode::SUCCESS)
+				RCLCPP_INFO(node_->get_logger(), "Motion plan executed!\n");
+			else
+				RCLCPP_ERROR(node_->get_logger(), "Motion execution failed\n");
+		}
 	}
 	else
 	{
@@ -238,6 +298,7 @@ void ArmMoveGroup::execute_cb_(const std_msgs::msg::Bool::SharedPtr execute_msg)
 
 	joint_space_goal_recv_ = false;
 	pose_goal_recv_ = false;
+	linear_trajectory_recv_ = false;
 }
 
 
@@ -253,6 +314,7 @@ void ArmMoveGroup::stop_cb_(const std_msgs::msg::Bool::SharedPtr stop_msg)
 
 	joint_space_goal_recv_ = false;
 	pose_goal_recv_ = false;
+	linear_trajectory_recv_ = false;
 }
 
 

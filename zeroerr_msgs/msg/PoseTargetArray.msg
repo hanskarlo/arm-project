@@ -1,3 +1,4 @@
+string type
 uint8 speed_factor
 float32 step_size
 float32 jump_threshold

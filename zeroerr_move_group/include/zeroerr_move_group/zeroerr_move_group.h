@@ -44,6 +44,7 @@ class ArmMoveGroup
         
         bool joint_space_goal_recv_ = false;
         bool pose_goal_recv_ = false;
+        bool linear_trajectory_recv_ = false;
 
         // rclcpp::Subscription<zeroerr_msgs::msg::CollisionObject>::SharedPtr collision_obj_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr collision_obj_sub_;
@@ -53,6 +54,8 @@ class ArmMoveGroup
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_execute_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_stop_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_clear_sub_;
+
+        moveit_msgs::msg::RobotTrajectory trajectory_;
 
         // void coll_obj_cb_(const zeroerr_msgs::msg::CollisionObject::SharedPtr coll_obj_msg);
         void coll_obj_cb_(const std_msgs::msg::Bool::SharedPtr coll_obj_msg);
