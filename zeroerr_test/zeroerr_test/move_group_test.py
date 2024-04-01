@@ -1,4 +1,3 @@
-
 import time
 import copy
 import numpy as np
@@ -219,7 +218,7 @@ class MoveGroupTest(Node):
         self.get_logger().info('Homing!')
 
         jst = JointSpaceTarget()
-        jst.speed = 15
+        jst.speed = 25
         jst.joint_deg[0] = 0
         jst.joint_deg[1] = 0
         jst.joint_deg[2] = 0
@@ -330,7 +329,7 @@ class MoveGroupTest(Node):
             #* Rectangle (10cm x 10cm) in xz plane
             pta = PoseTargetArray()
             pta.type = "linear"
-            pta.step_size = 0.01     # 1cm step size interpolation
+            pta.step_size = 0.02     # 1cm step size interpolation
             pta.jump_threshold = 0.0 # Disabled
 
             start_pose.position.x -= 0.1
@@ -361,7 +360,19 @@ class MoveGroupTest(Node):
             waypoint_to_add = copy.deepcopy(start_pose)
             pta.waypoints.append(waypoint_to_add)
 
-            start_pose.position.y -= 0.4
+            start_pose.position.y += 0.4
+            waypoint_to_add = copy.deepcopy(start_pose)
+            pta.waypoints.append(waypoint_to_add)
+
+            start_pose.position.z += 0.12
+            waypoint_to_add = copy.deepcopy(start_pose)
+            pta.waypoints.append(waypoint_to_add)
+
+            start_pose.position.y -= 0.1
+            waypoint_to_add = copy.deepcopy(start_pose)
+            pta.waypoints.append(waypoint_to_add)
+
+            start_pose.position.z -= 0.1
             waypoint_to_add = copy.deepcopy(start_pose)
             pta.waypoints.append(waypoint_to_add)
 

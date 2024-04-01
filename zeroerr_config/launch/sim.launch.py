@@ -11,15 +11,12 @@ from moveit_configs_utils import MoveItConfigsBuilder
 
 def generate_launch_description():
 
-    # Use real hardware
-    """
-    Change hardware type parameter in zeroerr_arm.ros2_control.xacro to use
-    zeroerr_hardware/ArmHardwareInterface plugin (actual hardware)
-    """
+    # Command-line arguments
+
     ros2_control_hardware_type = DeclareLaunchArgument(
         "ros2_control_hardware_type",
-        default_value="real",
-        description="ROS 2 control hardware interface type to use for the launch file -- possible values: [mock_components, real]",
+        default_value="mock_components",
+        description="ROS 2 control hardware interface type to use for the launch file -- possible values: [mock_components, isaac]",
     )
 
     moveit_config = (
@@ -54,19 +51,12 @@ def generate_launch_description():
         arguments=["--ros-args", "--log-level", "info"],
     )
 
-    arm_interface = Node(
-        package="zeroerr_interface",
-        executable="zeroerr_interface",
-        output="screen",
-    )
-
     # RViz
     rviz_config = os.path.join(
         get_package_share_directory("zeroerr_config"),
         "config", 
         "moveit.rviz"
     )
-
     rviz_node = Node(
         package="rviz2",
         executable="rviz2",
@@ -100,7 +90,7 @@ def generate_launch_description():
         parameters=[moveit_config.robot_description],
     )
 
-    # ros2_control using real hardware
+    # ros2_control using FakeSystem as hardware
     ros2_controllers_path = os.path.join(
         get_package_share_directory("zeroerr_config"),
         "config",
@@ -109,7 +99,10 @@ def generate_launch_description():
     ros2_control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
-        parameters=[moveit_config.robot_description, ros2_controllers_path],
+        parameters=[ros2_controllers_path],
+        remappings=[
+            ("/controller_manager/robot_description", "/robot_description"),
+        ],
         output="screen",
     )
 
@@ -127,6 +120,7 @@ def generate_launch_description():
         package="controller_manager",
         executable="spawner",
         arguments=["arm_group_controller", "-c", "/controller_manager"],
+        # prefix=["sudo -E"]
     )
 
     return LaunchDescription(
