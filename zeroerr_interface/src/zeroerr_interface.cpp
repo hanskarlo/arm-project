@@ -1,3 +1,4 @@
+
 #include "zeroerr_interface/zeroerr_interface.h"
 
 
@@ -174,18 +175,17 @@ bool ZeroErrInterface::set_drive_parameters_()
 {
     uint32_t abort_code;
     size_t result_size;
-    int32_t dint;
 
     for (uint i = 0; i < NUM_JOINTS; i++)
     {
         // Set target velocity
-        dint = 0;
+        uint32_t initial_target_vel = 0;
         if (ecrt_master_sdo_download(
                 master,
                 i,
                 TARGET_VELOCITY,
-                (uint8_t *)&dint,
-                sizeof(dint),
+                (uint8_t *)&initial_target_vel,
+                sizeof(initial_target_vel),
                 &abort_code))
         {
             RCLCPP_ERROR(this->get_logger(), "Failed to download target velocity for j%d", i);
@@ -196,15 +196,15 @@ bool ZeroErrInterface::set_drive_parameters_()
                 master,
                 i,
                 TARGET_VELOCITY,
-                (uint8_t *)&dint,
-                sizeof(dint),
+                (uint8_t *)&initial_target_vel,
+                sizeof(initial_target_vel),
                 &result_size,
                 &abort_code))
         {
             RCLCPP_ERROR(this->get_logger(), "Failed to upload target velocity for j%d", i);
             return false;
         }
-        RCLCPP_INFO(this->get_logger(), "Changed target velocity: %u counts/s for j%i", dint, i);
+        RCLCPP_INFO(this->get_logger(), "Changed target velocity: %u counts/s for j%i", initial_target_vel, i);
 
 
         // Set max velocity
@@ -380,36 +380,6 @@ bool ZeroErrInterface::set_drive_parameters_()
         RCLCPP_INFO(this->get_logger(), "Changed Position following error window %u for j%d", pos_follow_err_window, i);
 
 
-        // Position following error timeout
-        //? Changing position window timeout (0x6068) changes this parameter too
-        // uint16_t pos_follow_err_timeout = 5000; //ms
-        // if (ecrt_master_sdo_download(
-        //         master,
-        //         i,
-        //         POS_FOLLOW_ERR_TIMEOUT,
-        //         (uint8_t *)&pos_follow_err_timeout,
-        //         sizeof(pos_follow_err_timeout),
-        //         &abort_code))
-        // {
-        //     RCLCPP_ERROR(this->get_logger(), "Failed to change position following error window for j%d", i);
-        //     return false;
-        // }
-
-        // if (ecrt_master_sdo_upload(
-        //         master,
-        //         i,
-        //         POS_FOLLOW_ERR_TIMEOUT,
-        //         (uint8_t *)&pos_follow_err_timeout,
-        //         sizeof(pos_follow_err_timeout),
-        //         &result_size,
-        //         &abort_code))
-        // {
-        //     RCLCPP_ERROR(this->get_logger(), "Failed to change position following error window for j%d", i);
-        //     return false;
-        // }
-        // RCLCPP_INFO(this->get_logger(), "Changed position following error window %ums for j%d", pos_follow_err_timeout, i);
-
-
         // Position window
         uint32_t pos_window = pos_follow_err_window;
         if (ecrt_master_sdo_download(
@@ -440,6 +410,7 @@ bool ZeroErrInterface::set_drive_parameters_()
 
 
         // Position following timeout
+        //? This also changes POS_FOLLOW_ERR_TIMEOUT (0x6066, 0) parameter
         uint16_t pos_window_timeout = 5000; //ms
         if (ecrt_master_sdo_download(
                 master,

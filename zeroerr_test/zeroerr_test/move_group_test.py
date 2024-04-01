@@ -1,5 +1,7 @@
+
 import time
 import copy
+from tracemalloc import start
 import numpy as np
 from psutil import wait_procs
 import rclpy
@@ -11,6 +13,27 @@ from zeroerr_msgs.msg import CollisionObject
 from zeroerr_msgs.msg import JointSpaceTarget
 from zeroerr_msgs.msg import PoseTargetArray
 from zeroerr_msgs.msg import PoseTarget
+
+
+def get_quaternion_from_euler(roll, pitch, yaw):
+  """
+  Convert an Euler angle to a quaternion.
+   
+  Input
+    :param roll: The roll (rotation around x-axis) angle in radians.
+    :param pitch: The pitch (rotation around y-axis) angle in radians.
+    :param yaw: The yaw (rotation around z-axis) angle in radians.
+ 
+  Output
+    :return qx, qy, qz, qw: The orientation in quaternion [x,y,z,w] format
+  """
+  qx = np.sin(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) - np.cos(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
+  qy = np.cos(roll/2) * np.sin(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.cos(pitch/2) * np.sin(yaw/2)
+  qz = np.cos(roll/2) * np.cos(pitch/2) * np.sin(yaw/2) - np.sin(roll/2) * np.sin(pitch/2) * np.cos(yaw/2)
+  qw = np.cos(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
+ 
+  return [qx, qy, qz, qw]
+
 
 class MoveGroupTest(Node):
 
@@ -79,11 +102,12 @@ class MoveGroupTest(Node):
 
 
     def timer_cb_(self):
-        print("""\nEnter number corresponding to an action:
+        print("""\nEnter number/character corresponding to an action:
             '1': Basic move test
             '2': Stop test
             '3': Linear movement test
             '4': Arc test
+            '5': Precision test
             'h': Home test
             'c': Setup lab environment
             """)
@@ -97,6 +121,8 @@ class MoveGroupTest(Node):
             self.linear_test_()
         elif test_no == '4':
             self.arc_test_()
+        elif test_no == '5':
+            self.precision_test_()
         elif test_no == 'h':
             self.home_test_()
         elif test_no == 'c':
@@ -146,9 +172,9 @@ class MoveGroupTest(Node):
                 self.get_logger().info(f"Moving J{i} 90° at {jst.speed}% speed")
 
                 if i < 4:
-                    jst.joint_deg = 90
+                    jst.joint_deg[i] = 90
                 else:
-                    jst.joint_deg = 180
+                    jst.joint_deg[i] = 180
                 self.joint_space_target_pub_.publish(jst)
 
                 if input("Execute (y/n)? ").lower() == "y":
@@ -218,7 +244,7 @@ class MoveGroupTest(Node):
         self.get_logger().info('Homing!')
 
         jst = JointSpaceTarget()
-        jst.speed = 25
+        jst.speed = 50
         jst.joint_deg[0] = 0
         jst.joint_deg[1] = 0
         jst.joint_deg[2] = 0
@@ -254,57 +280,57 @@ class MoveGroupTest(Node):
         start_pose.position.z = 0.77396
 
         #* Go to start pose
-        # pt = PoseTarget()
-        # pt.speed = 45
-        # pt.pose = start_pose
+        pt = PoseTarget()
+        pt.speed = 45
+        pt.pose = start_pose
 
-        # self.get_logger().info("Moving to starting point")
+        self.get_logger().info("Moving to starting point")
 
-        # self.pose_target_pub_.publish(pt)
-        # self.execute_pub_.publish(msg)
+        self.pose_target_pub_.publish(pt)
+        self.execute_pub_.publish(msg)
 
-        # time.sleep(10)
+        time.sleep(10)
 
-        # if (input("Start rectangle in xz plane (y/n)?").lower() == 'y'):
+        if (input("Start rectangle in xz plane (y/n)?").lower() == 'y'):
 
-        #     #* Rectangle in xz plane
-        #     pta = PoseTargetArray()
-        #     pta.type = "linear"
-        #     pta.step_size = 0.01     # 1cm step size interpolation
-        #     pta.jump_threshold = 0.0 # Disabled
-        #     start_pose.position.x += 0.2
-        #     waypoint_to_add = copy.deepcopy(start_pose)
-        #     pta.waypoints.append(waypoint_to_add)
+            #* Rectangle in xz plane
+            pta = PoseTargetArray()
+            pta.type = "linear"
+            pta.step_size = 0.01     # 1cm step size interpolation
+            pta.jump_threshold = 0.0 # Disabled
+            start_pose.position.x += 0.2
+            waypoint_to_add = copy.deepcopy(start_pose)
+            pta.waypoints.append(waypoint_to_add)
 
-        #     start_pose.position.z += 0.15
-        #     waypoint_to_add = copy.deepcopy(start_pose)
-        #     pta.waypoints.append(waypoint_to_add)
+            start_pose.position.z += 0.15
+            waypoint_to_add = copy.deepcopy(start_pose)
+            pta.waypoints.append(waypoint_to_add)
 
-        #     start_pose.position.x -= 0.3
-        #     waypoint_to_add = copy.deepcopy(start_pose)
-        #     pta.waypoints.append(waypoint_to_add)
+            start_pose.position.x -= 0.3
+            waypoint_to_add = copy.deepcopy(start_pose)
+            pta.waypoints.append(waypoint_to_add)
 
-        #     start_pose.position.z -= 0.15
-        #     waypoint_to_add = copy.deepcopy(start_pose)
-        #     pta.waypoints.append(waypoint_to_add)
+            start_pose.position.z -= 0.15
+            waypoint_to_add = copy.deepcopy(start_pose)
+            pta.waypoints.append(waypoint_to_add)
 
 
-        #     self.pose_array_pub_.publish(pta)
+            self.pose_array_pub_.publish(pta)
 
-        #     if input("Execute (y/n)?").lower() == 'y':
-        #         self.execute_pub_.publish(msg)
-        #     else:
-        #         self.clear_pub_.publish(msg)
-        #         return
+            if input("Execute (y/n)?").lower() == 'y':
+                self.execute_pub_.publish(msg)
+            else:
+                self.clear_pub_.publish(msg)
+                return
         
-        # else:
-        #     self.clear_pub_.publish(msg)
-        #     return
+        else:
+            self.clear_pub_.publish(msg)
+            return
         
-        # if (input("Bring arm home (y/n)?").lower() == 'y'):
-        #     self.home_test_()
-        # else:
-        #     return
+        if (input("Bring arm home (y/n)?").lower() == 'y'):
+            self.home_test_()
+        else:
+            return
 
         if (input("Start rectangle in yz plane (y/n)?").lower() == 'y'):
             
@@ -389,7 +415,6 @@ class MoveGroupTest(Node):
             self.clear_pub_.publish(msg)
             return
 
-    
 
     def arc_test_(self):
 
@@ -438,6 +463,118 @@ class MoveGroupTest(Node):
 
         self.pose_array_pub_.publish(pta)
 
+
+    def precision_test_(self):
+        print("\nMeasure a coordinate in 3D space using the reference bolt, where")
+        print("+x points to the left of table, +y points towards the desk, +z points toward the ceiling\n")
+
+
+        speed = int(input("Speed (1-100%)?: "))
+        x = float(input("Input x coordinate: "))
+        y = float(input("Input y coordinate: "))
+        z = float(input("Input z coordinate: "))
+
+        roll = np.deg2rad(int(input("Roll (in degrees)?:  ")))
+        pitch = np.deg2rad(int(input("Pitch (in degrees)?: ")))
+        yaw = np.deg2rad(int(input("Yaw (in degrees)?:   ")))
+
+
+        p = PoseTarget()
+        p.speed = speed
+        p.pose.position.x = x
+        p.pose.position.y = y
+        p.pose.position.z = z # Begin 10cm above target
+
+        [p.pose.orientation.x, 
+         p.pose.orientation.y, 
+         p.pose.orientation.z, 
+         p.pose.orientation.w] = get_quaternion_from_euler(roll, pitch, yaw)
+
+
+        #* Offsets from base_link to reference bolt
+        x_offset = 0.031
+        y_offset = -0.031
+        z_offset = 0.014
+
+        p.pose.position.x += x_offset
+        p.pose.position.y += y_offset
+        p.pose.position.z += z_offset
+
+
+        #* Create motion plan
+        self.pose_target_pub_.publish(p)
+
+        msg = Bool()
+        msg.data = True
+        if input("Execute (y/n)?").lower() == 'y':
+            self.execute_pub_.publish(msg)
+        else:
+            self.clear_pub_.publish(msg)
+            return
+
+
+        if input("Continue (y/n)?").lower() == 'y':
+            pta = PoseTargetArray()
+            pta.type = "linear"
+            pta.step_size = 0.01
+            pta.jump_threshold = 0.0
+
+            pta.waypoints.append(copy.deepcopy(p.pose))
+
+            p.pose.position.z -= 0.1
+            pta.waypoints.append(copy.deepcopy(p.pose))
+
+            p.pose.position.z += 0.1
+            pta.waypoints.append(copy.deepcopy(p.pose))
+
+            self.pose_array_pub_.publish(pta)
+        else:
+            self.clear_pub_.publish(msg)
+            return
+        
+
+        if input("Execute (y/n)?").lower() == 'y':
+            self.execute_pub_.publish(msg)
+        else:
+            self.clear_pub_.publish(msg)
+            return
+    
+
+        if input("Continue (y/n)?").lower() == 'y':
+            p.pose.position.x += 0.1
+            self.pose_target_pub_.publish(p)
+        else:
+            self.clear_pub_.publish(msg)
+            return
+
+
+        if input("Execute (y/n)?").lower() == 'y':
+            self.execute_pub_.publish(msg)
+        else:
+            self.clear_pub_.publish(msg)
+            return
+        
+
+        if input("Continue (y/n)?").lower() == 'y':
+            pta = PoseTargetArray()
+            pta.type = "linear"
+            pta.step_size = 0.01
+            pta.jump_threshold = 0.0
+
+            pta.waypoints.append(copy.deepcopy(p.pose))
+
+            p.pose.position.z -= 0.1
+            pta.waypoints.append(copy.deepcopy(p.pose))
+
+            p.pose.position.z += 0.1
+            pta.waypoints.append(copy.deepcopy(p.pose))
+
+            self.pose_array_pub_.publish(pta)
+        else:
+            self.clear_pub_.publish(msg)
+            return
+
+
     def collision_object_test_(self):
         self.get_logger().info("Adding collision object!")
 
@@ -446,7 +583,6 @@ class MoveGroupTest(Node):
         self.collision_obj_pub_.publish(msg)
 
         # TODO: Collision object support (Adds lab table for now)
-
 
 
 

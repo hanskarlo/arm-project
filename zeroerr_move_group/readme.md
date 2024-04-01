@@ -7,6 +7,8 @@
     - [Execute motion plan `arm/Execute`](#execute-motion-plan-armexecute)
     - [Stop arm `arm/Stop`](#stop-arm-armstop)
     - [Clear current motion plan `arm/Clear`](#clear-current-motion-plan-armclear)
+  - [Notes](#notes)
+    - [Motion Planners](#motion-planners)
 
 
 ## Description
@@ -71,3 +73,9 @@ To clear the current motion plan:
 ```bash
 ros2 topic pub --once /arm/Clear std_msgs/msg/Bool '{data: True}'
 ```
+
+## Notes
+### Motion Planners
+The aroarm move group interface node utilizes the STOMP planner for linear movements in space, and uses the PILZ ('CIRC') industrial motion planner for circular/arc movements.
+
+> :warning: STOMP planner only accepts **joint space** goals.
