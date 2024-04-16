@@ -13,10 +13,13 @@ find_package(geometry_msgs REQUIRED)
 find_package(shape_msgs REQUIRED)
 
 set(msg_files
+  "action/MoveToSaved.action"
   "msg/CollisionObject.msg"
   "msg/JointSpaceTarget.msg"
   "msg/PoseTargetArray.msg"
   "msg/PoseTarget.msg"
+  "srv/JointSpaceGoal.srv"
+  "srv/SaveMotion.srv"
 )
 
 rosidl_generate_interfaces(

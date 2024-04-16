@@ -11,6 +11,17 @@ ArmMoveGroup::ArmMoveGroup()
 	mg_node_ = rclcpp::Node::make_shared("mg_node_", node_options);
 	node_ = rclcpp::Node::make_shared(NODE_NAME, node_options);
 
+
+	exec_saved_traj_action_server_ = rclcpp_action::create_server<zeroerr_msgs::action::MoveToSaved>(
+		node_,
+		"arm/ExecuteSavedTrajectory",
+		std::bind(&ArmMoveGroup::est_handle_goal_, this, std::placeholders::_1, std::placeholders::_2),
+		std::bind(&ArmMoveGroup::est_handle_cancel_, this, std::placeholders::_1),
+		std::bind(&ArmMoveGroup::est_handle_accepted_, this, std::placeholders::_1)
+	);
+
+
+
 	collision_obj_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
 		"arm/SetupLabEnvironment",
 		rclcpp::QoS(10),
@@ -53,6 +64,17 @@ ArmMoveGroup::ArmMoveGroup()
 		std::bind(&ArmMoveGroup::clear_cb_, this, std::placeholders::_1)
 	);
 
+
+	save_pose_srv_ = node_->create_service<zeroerr_msgs::srv::SavePose>(
+		"arm/SavePose", 
+		std::bind(&ArmMoveGroup::save_pose_, this, std::placeholders::_1, std::placeholders::_2)
+	);
+
+	save_traj_srv_ = node_->create_service<zeroerr_msgs::srv::SavePose>(
+		"arm/SaveTrajectory", 
+		std::bind(&ArmMoveGroup::save_traj_, this, std::placeholders::_1, std::placeholders::_2)
+	);
+
 	RCLCPP_INFO(node_->get_logger(), "Initialized!");
 }
 
@@ -62,6 +84,37 @@ ArmMoveGroup::~ArmMoveGroup()
 
 	table_.operation = table_.REMOVE;
 	planning_scene_interface_.applyCollisionObject(table_);
+}
+
+
+
+rclcpp_action::GoalResponse ArmMoveGroup::est_handle_goal_(const rclcpp_action::GoalUUID & uuid, std::shared_ptr<const zeroerr_msgs::action::MoveToSaved::Goal> goal)
+{
+	RCLCPP_INFO(node_->get_logger(), "Received action request to execute trajectory: %s", goal->label.c_str());
+	(void)uuid;
+
+	return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+}
+
+
+rclcpp_action::CancelResponse ArmMoveGroup::est_handle_cancel_(const std::shared_ptr<zeroerr_msgs::action::MoveToSaved> goal_handle)
+{
+	RCLCPP_WARN(node_->get_logger(), "Receieved request to cancel trajectory execution!");
+	(void)goal_handle;
+
+	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+
+	move_group.stop();
+
+	return rclcpp_action::CancelResponse::ACCEPT;
+}
+
+
+void ArmMoveGroup::est_handle_accepted_(const std::shared_ptr<zeroerr_msgs::action::MoveToSaved> goal_handle)
+{
+	// TODO: Read serialized trajectory
+
+
 }
 
 
@@ -139,7 +192,6 @@ void ArmMoveGroup::joint_space_cb_(zeroerr_msgs::msg::JointSpaceTarget::SharedPt
 		RCLCPP_WARN(node_->get_logger(), "Target joint position(s) were outside of limits, but we will plan and clamp to the limits ");
 	}
 	// RCLCPP_INFO(node_->get_logger(), "Motion plan within bounds!\n");
-
 
 	bool success = (move_group.plan(plan_) == moveit::core::MoveItErrorCode::SUCCESS);
 
@@ -385,6 +437,154 @@ void ArmMoveGroup::timer_cb_()
 {
 	RCLCPP_INFO(mg_node_->get_logger(), "Spinning");
 	std::cout << "spinning\n"; 
+}
+
+
+void ArmMoveGroup::save_pose_(const std::shared_ptr<zeroerr_msgs::srv::SaveMotion::Request> request, std::shared_ptr<zeroerr_msgs::srv::SaveMotion::Response> response)
+{
+	RCLCPP_INFO(node_->get_logger(), "Received save pose request.");
+
+	// Start move group node state monitor
+	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+	move_group.startStateMonitor(2.0);
+
+	// Get current state
+	moveit::core::RobotStatePtr current_state = move_group.getCurrentState();
+	const moveit::core::JointModelGroup* joint_model_group =
+      move_group.getCurrentState()->getJointModelGroup(PLANNING_GROUP);
+
+	std::vector<double> joint_group_positions;
+	current_state->copyJointGroupPositions(joint_model_group, joint_group_positions);
+
+	// for (uint i = 0; i < NUM_JOINTS; i++)
+	// 	RCLCPP_INFO(node_->get_logger(), "J%d: %f", (i + 1), joint_group_positions[i]);
+
+
+	std::string file_name = request->label;
+	file_name.append(".pose");
+	{
+		std::ofstream os(file_name.c_str(), std::ios::binary);
+		cereal::BinaryOutputArchive oa(os);
+
+		oa(joint_group_positions);
+	}
+
+	std::vector<double> joint_group_positions_temp;
+	{
+		std::ifstream is(file_name.c_str(), std::ios::binary);
+		cereal::BinaryInputArchive ia(is);
+
+		ia(joint_group_positions_temp);
+	}
+
+
+	// RCLCPP_INFO(node_->get_logger(), "Reading back saved pose: ");
+	// for (uint i = 0; i < NUM_JOINTS; i++)
+	// 	RCLCPP_INFO(node_->get_logger(), "J%d: %f", (i + 1), joint_group_positions_temp[i]);
+		
+
+	if (!memcmp(&joint_group_positions.front(), &joint_group_positions_temp.front(), (size_t) NUM_JOINTS))
+	{
+		RCLCPP_INFO(node_->get_logger(), "Pose successfully saved into %s", file_name.c_str());
+		response->saved = true;
+	}
+	else
+	{
+		RCLCPP_INFO(node_->get_logger(), "Saving pose failed.");
+		response->saved = false;
+	}
+}
+
+
+void ArmMoveGroup::save_traj_(const std::shared_ptr<zeroerr_msgs::srv::SaveMotion::Request> request, std::shared_ptr<zeroerr_msgs::srv::SaveMotion::Response> response)
+{
+	RCLCPP_INFO(node_->get_logger(), "Received save motion plan request.");
+
+	size_t num_points = plan_.trajectory.joint_trajectory.points.size();
+	SerializedTrajectory st;
+	st.points.resize(num_points);
+	st.sec.resize(num_points);
+	st.nanosec.resize(num_points);
+
+	RCLCPP_INFO(node_->get_logger(), "Saving trajectory with %lu points.", num_points);
+	RCLCPP_INFO(node_->get_logger(), "50th point: [%f %f %f %f %f %f] (time from start: %ds %uns)",
+		plan_.trajectory.joint_trajectory.points[49].positions[0],
+		plan_.trajectory.joint_trajectory.points[49].positions[1],
+		plan_.trajectory.joint_trajectory.points[49].positions[2],
+		plan_.trajectory.joint_trajectory.points[49].positions[3],
+		plan_.trajectory.joint_trajectory.points[49].positions[4],
+		plan_.trajectory.joint_trajectory.points[49].positions[5],
+		plan_.trajectory.joint_trajectory.points[49].time_from_start.sec,
+		plan_.trajectory.joint_trajectory.points[49].time_from_start.nanosec);
+
+	for (uint i = 0; i < num_points; i++)
+	{
+		st.points[i].reserve(NUM_JOINTS);
+		st.points[i] = plan_.trajectory.joint_trajectory.points[i].positions;
+		st.sec[i] = plan_.trajectory.joint_trajectory.points[i].time_from_start.sec;
+		st.nanosec[i] = plan_.trajectory.joint_trajectory.points[i].time_from_start.nanosec;
+	}
+
+	std::string file_name = request->label;
+	file_name.append(".trajectory");
+	{
+		std::ofstream os(file_name.c_str(), std::ios::binary);
+		cereal::BinaryOutputArchive oa(os);
+
+		oa( st );
+	}
+
+	SerializedTrajectory st2;
+	{
+		std::ifstream is(file_name.c_str(), std::ios::binary);
+		cereal::BinaryInputArchive ia(is);
+
+		ia(st2);
+	}
+
+	RCLCPP_INFO(node_->get_logger(), "Reading saved trajectory with %lu points.", st2.points.size());
+	RCLCPP_INFO(node_->get_logger(), "50th point: [%f %f %f %f %f %f] (time from start: %ds %uns)",
+		st2.points[49][0],
+		st2.points[49][1],
+		st2.points[49][2],
+		st2.points[49][3],
+		st2.points[49][4],
+		st2.points[49][5],
+		st2.sec[49],
+		st2.nanosec[49]);
+
+	if (!memcmp(&st.points, &st2.points, st.points.size()))
+	{
+		RCLCPP_INFO(node_->get_logger(), "Trajectory successfully saved into %s", file_name.c_str());
+		response->saved = true;
+	}
+	else
+	{
+		RCLCPP_INFO(node_->get_logger(), "Saving trajectory failed.");
+		response->saved = false;
+	}
+
+	moveit_msgs::msg::RobotTrajectory test_traj_;
+	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+
+	test_traj_.joint_trajectory.header.frame_id = move_group.getPoseReferenceFrame();
+	test_traj_.joint_trajectory.header.stamp = node_->now();
+
+	for (uint i = 0; i < st2.points.size(); i++)
+	{
+		test_traj_.joint_trajectory.points[i].positions = st2.points[i];
+		test_traj_.joint_trajectory.points[i].time_from_start.sec = st2.sec[i];
+		test_traj_.joint_trajectory.points[i].time_from_start.nanosec = st2.nanosec[i];
+	}
+
+	RCLCPP_INFO(node_->get_logger(), "Attempting to execute saved trajectory...");
+
+	if (move_group.execute(test_traj_) == moveit::core::MoveItErrorCode::SUCCESS)
+		RCLCPP_INFO(node_->get_logger(), "Success!");
+	else
+		RCLCPP_INFO(node_->get_logger(), "Execution failed");
+
+	move_group.getCurrentState()->printStateInfo()
 }
 
 

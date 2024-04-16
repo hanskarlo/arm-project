@@ -1,0 +1,3 @@
+string label    # Pose label
+---
+bool saved      # True if saved, false if failed

@@ -1,0 +1,5 @@
+string label                # Pose or Trajectory to move to
+---
+bool result                 
+---
+int64[6] joint_position   # Real-time joint position feedback
