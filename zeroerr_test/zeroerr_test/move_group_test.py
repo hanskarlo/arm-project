@@ -1,18 +1,19 @@
-
 import time
 import copy
-from tracemalloc import start
+import yaml
+
 import numpy as np
-from psutil import wait_procs
 import rclpy
 from rclpy.node import Node
 
 from std_msgs.msg import Bool
 from geometry_msgs.msg import Pose
+
 from zeroerr_msgs.msg import CollisionObject
 from zeroerr_msgs.msg import JointSpaceTarget
 from zeroerr_msgs.msg import PoseTargetArray
 from zeroerr_msgs.msg import PoseTarget
+from zeroerr_msgs.srv import JointSpaceGoal
 
 
 def get_quaternion_from_euler(roll, pitch, yaw):
@@ -58,6 +59,9 @@ class MoveGroupTest(Node):
             "arm/JointSpaceGoal",
             10
         )
+
+        # JointSpaceGoal client 
+        self.jsg_client = self.create_client(JointSpaceGoal, "Joint Space Goal Service")
 
         # PoseTargetArray publisher
         self.pose_array_pub_ = self.create_publisher(

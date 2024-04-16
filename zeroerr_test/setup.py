@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'move_group_test = zeroerr_test.move_group_test:main',
+            'save_test = zeroerr_test.save_test:main',
         ],
     },
 )
