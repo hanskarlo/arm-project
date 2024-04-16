@@ -19,7 +19,7 @@ def generate_launch_description():
     """
     ros2_control_hardware_type = DeclareLaunchArgument(
         "ros2_control_hardware_type",
-        default_value="real",
+        default_value="mock_components",
         description="ROS 2 control hardware interface type to use for the launch file -- possible values: [mock_components, real]",
     )
 

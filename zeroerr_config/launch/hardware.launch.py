@@ -127,8 +127,9 @@ def generate_launch_description():
         package="controller_manager",
         executable="spawner",
         arguments=["arm_group_controller", "-c", "/controller_manager"],
+        # prefix=["sudo -E"]
     )
-
+    
     return LaunchDescription(
         [
             ros2_control_hardware_type,

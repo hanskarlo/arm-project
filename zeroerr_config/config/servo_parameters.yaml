@@ -1,4 +1,33 @@
 ## MoveIt properties
 move_group_name:  arm_group
-joint_limit_margins: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1]  # added as a buffer to joint limits [radians or meters]. If moving quickly, make this larger.
+planning_frame: base_link
+robot_link_command_frame: base_link
+
 command_out_topic: /arm_group_controller/joint_trajectory
+command_out_type: trajectory_msgs/JointTrajectory
+command_in_type: "speed_units"  # "unitless"> in the range [-1:1], as if from joystick. "speed_units"> cmds are in m/s and rad/s
+
+publish_joint_positions: true
+publish_joint_velocities: false
+publish_joint_accelerations: false
+
+joint_topic: /joint_states  # Get joint states from this topic
+
+is_primary_planning_scene_monitor: false
+check_octomap_collisions: false  # Check collision against the octomap (if a 3D sensor plugin is available)
+
+joint_limit_margins: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1]  # added as a buffer to joint limits [radians or meters]. If moving quickly, make this larger.
+lower_singularity_threshold:  17.0  # Start decelerating when the condition number hits this (close to singularity)
+hard_stop_singularity_threshold: 50.0 # 30.0  # Stop when the condition number hits this
+leaving_singularity_threshold_multiplier: 2.0  # Multiply the hard stop limit by this when leaving singularity (see https://github.com/ros-planning/moveit2/pull/620)
+# override_velocity_scaling_factor = 0.0 # valid range [0.0:1.0]
+
+## Plugins for smoothing outgoing commands
+use_smoothing: true
+smoothing_filter_plugin_name: "online_signal_smoothing::AccelerationLimitedPlugin"
+
+## Collision checking for the entire robot body
+check_collisions: true  # Check collisions?
+collision_check_rate: 10.0  # [Hz] Collision-checking can easily bog down a CPU if done too often.
+self_collision_proximity_threshold: 0.01  # Start decelerating when a self-collision is this far [m]
+scene_collision_proximity_threshold: 0.02  # Start decelerating when a scene collision is this far [m]
