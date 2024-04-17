@@ -11,69 +11,66 @@ ArmMoveGroup::ArmMoveGroup()
 	mg_node_ = rclcpp::Node::make_shared("mg_node_", node_options);
 	node_ = rclcpp::Node::make_shared(NODE_NAME, node_options);
 
-
-	exec_saved_traj_action_server_ = rclcpp_action::create_server<zeroerr_msgs::action::MoveToSaved>(
-		node_,
-		"arm/ExecuteSavedTrajectory",
-		std::bind(&ArmMoveGroup::est_handle_goal_, this, std::placeholders::_1, std::placeholders::_2),
-		std::bind(&ArmMoveGroup::est_handle_cancel_, this, std::placeholders::_1),
-		std::bind(&ArmMoveGroup::est_handle_accepted_, this, std::placeholders::_1)
-	);
-
-
+	using namespace std::placeholders;
 
 	collision_obj_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
 		"arm/SetupLabEnvironment",
 		rclcpp::QoS(10),
-		std::bind(&ArmMoveGroup::coll_obj_cb_, this, std::placeholders::_1)
+		std::bind(&ArmMoveGroup::coll_obj_cb_, this, _1)
 	);
 
 	joint_space_sub_ = node_->create_subscription<zeroerr_msgs::msg::JointSpaceTarget>(
 		"arm/JointSpaceGoal",
 		rclcpp::QoS(10),
-		std::bind(&ArmMoveGroup::joint_space_cb_, this, std::placeholders::_1)
+		std::bind(&ArmMoveGroup::joint_space_cb_, this, _1)
 	);
 
 	pose_array_sub_ = node_->create_subscription<zeroerr_msgs::msg::PoseTargetArray>(
 		"arm/PoseGoalArray",
 		rclcpp::QoS(10),
-		std::bind(&ArmMoveGroup::pose_array_cb_, this, std::placeholders::_1)
+		std::bind(&ArmMoveGroup::pose_array_cb_, this, _1)
 	);
 
 	pose_sub_ = node_->create_subscription<zeroerr_msgs::msg::PoseTarget>(
 		"arm/PoseGoal",
 		rclcpp::QoS(10),
-		std::bind(&ArmMoveGroup::pose_cb_, this, std::placeholders::_1)
+		std::bind(&ArmMoveGroup::pose_cb_, this, _1)
 	);
 
 	arm_execute_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
 		"arm/Execute",
 		rclcpp::QoS(1),
-		std::bind(&ArmMoveGroup::execute_cb_, this, std::placeholders::_1)
+		std::bind(&ArmMoveGroup::execute_cb_, this, _1)
 	);
 
 	arm_stop_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
 		"arm/Stop",
 		rclcpp::QoS(1),
-		std::bind(&ArmMoveGroup::stop_cb_, this, std::placeholders::_1)
+		std::bind(&ArmMoveGroup::stop_cb_, this, _1)
 	);
 
 	arm_clear_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
 		"arm/Clear",
 		rclcpp::QoS(1),
-		std::bind(&ArmMoveGroup::clear_cb_, this, std::placeholders::_1)
+		std::bind(&ArmMoveGroup::clear_cb_, this, _1)
 	);
 
 
-	save_pose_srv_ = node_->create_service<zeroerr_msgs::srv::SavePose>(
+	save_pose_srv_ = node_->create_service<zeroerr_msgs::srv::SaveMotion>(
 		"arm/SavePose", 
-		std::bind(&ArmMoveGroup::save_pose_, this, std::placeholders::_1, std::placeholders::_2)
+		std::bind(&ArmMoveGroup::save_pose_, this, _1, _2)
 	);
 
-	save_traj_srv_ = node_->create_service<zeroerr_msgs::srv::SavePose>(
+	save_traj_srv_ = node_->create_service<zeroerr_msgs::srv::SaveMotion>(
 		"arm/SaveTrajectory", 
-		std::bind(&ArmMoveGroup::save_traj_, this, std::placeholders::_1, std::placeholders::_2)
+		std::bind(&ArmMoveGroup::save_traj_, this, _1, _2)
 	);
+
+	move_to_saved_srv_ = node_->create_service<zeroerr_msgs::srv::MoveToSaved>(
+		"arm/MoveToSaved",
+		std::bind(&ArmMoveGroup::execute_saved_, this, _1, _2)
+	);
+
 
 	RCLCPP_INFO(node_->get_logger(), "Initialized!");
 }
@@ -87,36 +84,44 @@ ArmMoveGroup::~ArmMoveGroup()
 }
 
 
-
-rclcpp_action::GoalResponse ArmMoveGroup::est_handle_goal_(const rclcpp_action::GoalUUID & uuid, std::shared_ptr<const zeroerr_msgs::action::MoveToSaved::Goal> goal)
+void ArmMoveGroup::execute_saved_(
+	const std::shared_ptr<MoveToSaved::Request> request, 
+	std::shared_ptr<MoveToSaved::Response> response)
 {
-	RCLCPP_INFO(node_->get_logger(), "Received action request to execute trajectory: %s", goal->label.c_str());
-	(void)uuid;
+	// Get user-selected saved trajectory
+	const std::string label = request->label;
 
-	return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
-}
+	// Read saved trajectory
+	SerializedTrajectory st;
+	{
+		std::ifstream is(label.c_str(), std::ios::binary);
+		cereal::BinaryInputArchive ia(is);
 
+		ia(st);
+	}
 
-rclcpp_action::CancelResponse ArmMoveGroup::est_handle_cancel_(const std::shared_ptr<zeroerr_msgs::action::MoveToSaved> goal_handle)
-{
-	RCLCPP_WARN(node_->get_logger(), "Receieved request to cancel trajectory execution!");
-	(void)goal_handle;
-
+	// 
 	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+	moveit_msgs::msg::RobotTrajectory trajectory;
 
-	move_group.stop();
+	trajectory.joint_trajectory.header.frame_id = move_group.getPoseReferenceFrame();
+	trajectory.joint_trajectory.header.stamp = node_->now();
 
-	return rclcpp_action::CancelResponse::ACCEPT;
+	for (uint i = 0; i < st.points.size(); i++)
+	{
+		trajectory.joint_trajectory.points[i].positions = st.points[i];
+		trajectory.joint_trajectory.points[i].time_from_start.sec = st.sec[i];
+		trajectory.joint_trajectory.points[i].time_from_start.nanosec = st.nanosec[i];
+	}
+
+	RCLCPP_INFO(node_->get_logger(), "Attempting to execute saved trajectory...");
+	
+	if (move_group.asyncExecute(trajectory) == moveit::core::MoveItErrorCode::SUCCESS)
+		RCLCPP_INFO(node_->get_logger(), "Success!");
+	else
+		RCLCPP_INFO(node_->get_logger(), "Execution failed");
+
 }
-
-
-void ArmMoveGroup::est_handle_accepted_(const std::shared_ptr<zeroerr_msgs::action::MoveToSaved> goal_handle)
-{
-	// TODO: Read serialized trajectory
-
-
-}
-
 
 
 
@@ -440,7 +445,9 @@ void ArmMoveGroup::timer_cb_()
 }
 
 
-void ArmMoveGroup::save_pose_(const std::shared_ptr<zeroerr_msgs::srv::SaveMotion::Request> request, std::shared_ptr<zeroerr_msgs::srv::SaveMotion::Response> response)
+void ArmMoveGroup::save_pose_(
+	const std::shared_ptr<SaveMotion::Request> request, 
+	std::shared_ptr<SaveMotion::Response> response)
 {
 	RCLCPP_INFO(node_->get_logger(), "Received save pose request.");
 
@@ -496,7 +503,9 @@ void ArmMoveGroup::save_pose_(const std::shared_ptr<zeroerr_msgs::srv::SaveMotio
 }
 
 
-void ArmMoveGroup::save_traj_(const std::shared_ptr<zeroerr_msgs::srv::SaveMotion::Request> request, std::shared_ptr<zeroerr_msgs::srv::SaveMotion::Response> response)
+void ArmMoveGroup::save_traj_(
+	const std::shared_ptr<SaveMotion::Request> request, 
+	std::shared_ptr<SaveMotion::Response> response)
 {
 	RCLCPP_INFO(node_->get_logger(), "Received save motion plan request.");
 
@@ -553,17 +562,6 @@ void ArmMoveGroup::save_traj_(const std::shared_ptr<zeroerr_msgs::srv::SaveMotio
 		st2.sec[49],
 		st2.nanosec[49]);
 
-	if (!memcmp(&st.points, &st2.points, st.points.size()))
-	{
-		RCLCPP_INFO(node_->get_logger(), "Trajectory successfully saved into %s", file_name.c_str());
-		response->saved = true;
-	}
-	else
-	{
-		RCLCPP_INFO(node_->get_logger(), "Saving trajectory failed.");
-		response->saved = false;
-	}
-
 	moveit_msgs::msg::RobotTrajectory test_traj_;
 	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
 
@@ -584,7 +582,7 @@ void ArmMoveGroup::save_traj_(const std::shared_ptr<zeroerr_msgs::srv::SaveMotio
 	else
 		RCLCPP_INFO(node_->get_logger(), "Execution failed");
 
-	move_group.getCurrentState()->printStateInfo()
+	move_group.getCurrentState()->printStateInfo();
 }
 
 

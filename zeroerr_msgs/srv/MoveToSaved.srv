@@ -1,0 +1,3 @@
+string label                # Pose or Trajectory to move to
+---
+bool executed

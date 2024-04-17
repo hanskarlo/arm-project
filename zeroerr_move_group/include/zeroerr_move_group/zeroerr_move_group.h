@@ -26,6 +26,7 @@
 #include "zeroerr_msgs/msg/pose_target.hpp"
 
 #include "zeroerr_msgs/srv/save_motion.hpp"
+#include "zeroerr_msgs/srv/move_to_saved.hpp"
 
 using namespace std::chrono_literals;
 
@@ -63,12 +64,7 @@ class ArmMoveGroup
         rclcpp::Subscription<zeroerr_msgs::msg::PoseTarget>::SharedPtr pose_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_execute_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_stop_sub_;
-        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_clear_sub_;
-
-        rclcpp::Service<zeroerr_msgs::srv::SaveMotion>::SharedPtr save_pose_srv_;
-        rclcpp::Service<zeroerr_msgs::srv::SaveMotion>::SharedPtr save_traj_srv_;
-
-        rclcpp_action::Server<zeroerr_msgs::action::MoveToSaved>::SharedPtr exec_saved_traj_action_server_;
+        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_clear_sub_;      
 
         moveit_msgs::msg::RobotTrajectory trajectory_;
 
@@ -83,17 +79,19 @@ class ArmMoveGroup
         void timer_cb_();
 
 
-        //* Action handlers
-        
-        // /arm/ExecuteSaveTrajectory action handlers 
-        rclcpp_action::GoalResponse est_handle_goal_(const rclcpp_action::GoalUUID & uuid, std::shared_ptr<const zeroerr_msgs::action::MoveToSaved::Goal> goal);
-        rclcpp_action::CancelResponse est_handle_cancel_(const std::shared_ptr<zeroerr_msgs::action::MoveToSaved> goal_handle);
-        void est_handle_accepted_(const std::shared_ptr<zeroerr_msgs::action::MoveToSaved> goal_handle);
+        //* Feature-set services
+        using SaveMotion = zeroerr_msgs::srv::SaveMotion;
+        using MoveToSaved = zeroerr_msgs::srv::MoveToSaved;
+        rclcpp::Service<SaveMotion>::SharedPtr save_pose_srv_;
+        rclcpp::Service<SaveMotion>::SharedPtr save_traj_srv_;
+        rclcpp::Service<MoveToSaved>::SharedPtr move_to_saved_srv_;  
+
 
         // Service callbacks
-        void save_pose_(const std::shared_ptr<zeroerr_msgs::srv::SaveMotion::Request> request, std::shared_ptr<zeroerr_msgs::srv::SaveMotion::Response> response);
-        void save_traj_(const std::shared_ptr<zeroerr_msgs::srv::SaveMotion::Request> request, std::shared_ptr<zeroerr_msgs::srv::SaveMotion::Response> response);
-       
+        void save_pose_(const std::shared_ptr<SaveMotion::Request> request, std::shared_ptr<SaveMotion::Response> response);
+        void save_traj_(const std::shared_ptr<SaveMotion::Request> request, std::shared_ptr<SaveMotion::Response> response);
+        void execute_saved_(const std::shared_ptr<MoveToSaved::Request> request, std::shared_ptr<MoveToSaved::Response> response);
+
         zeroerr_msgs::msg::JointSpaceTarget arm_joint_space_cmd_;
         zeroerr_msgs::msg::PoseTarget arm_point_cmd_;
         moveit_msgs::msg::CollisionObject table_;
