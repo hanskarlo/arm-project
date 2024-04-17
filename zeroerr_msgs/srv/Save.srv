@@ -1,0 +1,4 @@
+string label    # Label for saved pose or trajectory
+string type     # Indicator for saving "pose" or "trajectory"
+---
+bool saved      # Indicate successful save

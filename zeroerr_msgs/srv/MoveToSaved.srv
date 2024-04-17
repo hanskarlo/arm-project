@@ -1,3 +1,4 @@
-string label                # Pose or Trajectory to move to
+string label    # Pose or Trajectory to move to
+string type     # Indicate "pose" or "trajectory"    
 ---
-bool executed
+bool executed   # Indicate successful start to execution

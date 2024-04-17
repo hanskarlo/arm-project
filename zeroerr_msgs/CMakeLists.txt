@@ -18,7 +18,7 @@ set(msg_files
   "msg/PoseTargetArray.msg"
   "msg/PoseTarget.msg"
   "srv/JointSpaceGoal.srv"
-  "srv/SaveMotion.srv"
+  "srv/Save.srv"
   "srv/MoveToSaved.srv"
 )
 
