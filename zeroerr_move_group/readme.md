@@ -2,7 +2,7 @@
 - [AroArm Move Group Interface](#aroarm-move-group-interface)
   - [Description](#description)
   - [Features](#features)
-    - [Generate motion plan to join space goal `arm/JointSpaceGoal`](#generate-motion-plan-to-join-space-goal-armjointspacegoal)
+    - [Generate motion plan to joint space goal `arm/JointSpaceGoal`](#generate-motion-plan-to-joint-space-goal-armjointspacegoal)
     - [Generate motion plan to pose goal `arm/PointGoal`](#generate-motion-plan-to-pose-goal-armpointgoal)
     - [Generate motion plan via array of end-effector poses (i.e. trajectory) `arm/PoseGoalArray`](#generate-motion-plan-via-array-of-end-effector-poses-ie-trajectory-armposegoalarray)
     - [Execute motion plan `arm/Execute`](#execute-motion-plan-armexecute)
@@ -18,7 +18,7 @@ This package contains the nodes that utilize the Move Group Interface C++ API to
 
 
 ## Features
-### Generate motion plan to join space goal `arm/JointSpaceGoal`
+### Generate motion plan to joint space goal `arm/JointSpaceGoal`
 The following command generates a motion plan at **10% of max speed** to joint angles:
 - J1: $10\degree$
 - J2: $45\degree$
@@ -28,7 +28,7 @@ The following command generates a motion plan at **10% of max speed** to joint a
 - J6: $90\degree$
 
 ```bash
-ros2 topic pub --once /arm/JointSpaceGoal zeroerr_msgs/msg/JointSpaceTarget '{speed: 10, joint_deg: [10, 45, 0, 0, 60, 90]}'
+ros2 service call /arm/JointSpaceGoal zeroerr_msgs/srv/JointSpaceGoal '{speed: 10, joint_deg: [10, 45, 0, 0, 60, 90]}'
 ```
 
 

@@ -19,12 +19,6 @@ ArmMoveGroup::ArmMoveGroup()
 		std::bind(&ArmMoveGroup::coll_obj_cb_, this, _1)
 	);
 
-	joint_space_sub_ = node_->create_subscription<zeroerr_msgs::msg::JointSpaceTarget>(
-		"arm/JointSpaceGoal",
-		rclcpp::QoS(10),
-		std::bind(&ArmMoveGroup::joint_space_cb_, this, _1)
-	);
-
 	pose_array_sub_ = node_->create_subscription<zeroerr_msgs::msg::PoseTargetArray>(
 		"arm/PoseGoalArray",
 		rclcpp::QoS(10),
@@ -55,6 +49,11 @@ ArmMoveGroup::ArmMoveGroup()
 		std::bind(&ArmMoveGroup::clear_cb_, this, _1)
 	);
 
+
+	joint_space_goal_srv_ = node_->create_service<JointSpaceGoal>(
+		"arm/JointSpaceGoal",
+		std::bind(&ArmMoveGroup::joint_space_goal_cb_, this, _1, _2)
+	);
 
 	save_srv_ = node_->create_service<Save>(
 		"arm/Save", 
@@ -113,18 +112,16 @@ void ArmMoveGroup::coll_obj_cb_(std_msgs::msg::Bool::SharedPtr coll_obj_msg)
 }
 
 
-void ArmMoveGroup::joint_space_cb_(zeroerr_msgs::msg::JointSpaceTarget::SharedPtr goal_msg)
+void ArmMoveGroup::joint_space_goal_cb_(const std::shared_ptr<JointSpaceGoal::Request> request, std::shared_ptr<JointSpaceGoal::Response> response)
 {
 	RCLCPP_INFO(node_->get_logger(), "Joint space goal received.");
-	joint_space_goal_recv_ = true;
-	linear_trajectory_recv_ = false;
-	pose_goal_recv_ = false;
+	
 
 	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+	move_group.startStateMonitor();
 
+	// Use STOMP
 	move_group.setPlanningPipelineId("stomp");
-
-	move_group.startStateMonitor(2.0);
 
 	moveit::core::RobotStatePtr current_state = move_group.getCurrentState();
 	move_group.setStartState(*current_state);
@@ -136,11 +133,11 @@ void ArmMoveGroup::joint_space_cb_(zeroerr_msgs::msg::JointSpaceTarget::SharedPt
 	current_state->copyJointGroupPositions(joint_model_group, joint_group_positions);
 
 	for (uint i = 0; i < NUM_JOINTS; i++)
-		joint_group_positions[i] = ((goal_msg->joint_deg[i] * PI) / 180); // Deg -> Rad
+		joint_group_positions[i] = ((request->joint_pos_deg[i] * PI) / 180); // Deg -> Rad
 	// RCLCPP_INFO(node_->get_logger(), "Converted deg to rad!\n");
 
 
-	float vel_scaling_factor = (float) (goal_msg->speed / 100.0);
+	float vel_scaling_factor = (float) (request->speed / 100.0);
 	move_group.setMaxVelocityScalingFactor(vel_scaling_factor);
 	move_group.setMaxAccelerationScalingFactor(0.5);
 	// RCLCPP_INFO(node_->get_logger(), "Velocity scaling factor: %f(%u/100)", vel_scaling_factor, goal_msg->speed);
@@ -156,9 +153,15 @@ void ArmMoveGroup::joint_space_cb_(zeroerr_msgs::msg::JointSpaceTarget::SharedPt
 	bool success = (move_group.plan(plan_) == moveit::core::MoveItErrorCode::SUCCESS);
 
 	if (success)
+	{
 		RCLCPP_INFO(node_->get_logger(), "Motion plan successful!\n");
+		response->valid = true;
+	}
 	else
+	{
 		RCLCPP_ERROR(node_->get_logger(), "Motion plan failed\n");
+		response->valid = false;
+	}
 }
 
 

@@ -14,7 +14,6 @@ find_package(shape_msgs REQUIRED)
 
 set(msg_files
   "msg/CollisionObject.msg"
-  "msg/JointSpaceTarget.msg"
   "msg/PoseTargetArray.msg"
   "msg/PoseTarget.msg"
   "srv/JointSpaceGoal.srv"
