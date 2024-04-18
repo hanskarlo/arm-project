@@ -1,4 +1,10 @@
+# Speed 0-100% of max speed
 uint8 speed
+
+# Joint goal positions in degrees
 int64[6] joint_pos_deg
+
 ---
+
+# Valid motion plan
 bool valid

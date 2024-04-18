@@ -1,0 +1,10 @@
+# Speed 0-100% of max speed
+uint8 speed
+
+# Goal pose
+geometry_msgs/Pose pose
+
+---
+
+# Valid motion plan to pose
+bool valid

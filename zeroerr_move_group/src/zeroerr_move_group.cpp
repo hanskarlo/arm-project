@@ -55,6 +55,11 @@ ArmMoveGroup::ArmMoveGroup()
 		std::bind(&ArmMoveGroup::joint_space_goal_cb_, this, _1, _2)
 	);
 
+	pose_goal_srv_ = node_->create_service<PoseGoal>(
+		"arm/PoseGoal",
+		std::bind(&ArmMoveGroup::pose_goal_cb_, this, _1, _2)
+	);
+
 	save_srv_ = node_->create_service<Save>(
 		"arm/Save", 
 		std::bind(&ArmMoveGroup::save_cb_, this, _1, _2)
@@ -165,6 +170,79 @@ void ArmMoveGroup::joint_space_goal_cb_(const std::shared_ptr<JointSpaceGoal::Re
 }
 
 
+void ArmMoveGroup::pose_goal_cb_(const std::shared_ptr<PoseGoal::Request> request, std::shared_ptr<PoseGoal::Response> response)
+{
+	RCLCPP_INFO(node_->get_logger(), "PoseGoal service called.");
+
+
+	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+
+	//! STOMP planner accepts only joint-space goals!
+	move_group.setPlanningPipelineId("stomp");
+
+	move_group.startStateMonitor(2.0);
+	moveit::core::RobotStatePtr current_state = move_group.getCurrentState();
+	
+	// Set start state to current state
+	moveit::core::RobotState start_state(*move_group.getCurrentState());
+	move_group.setStartState(start_state);
+
+	
+	const moveit::core::JointModelGroup* joint_model_group =
+      move_group.getCurrentState()->getJointModelGroup(PLANNING_GROUP);
+
+	std::vector<double> joint_group_positions;
+	current_state->copyJointGroupPositions(joint_model_group, joint_group_positions);
+
+	// for (uint i = 0; i < NUM_JOINTS; i++)
+	// 	RCLCPP_INFO(node_->get_logger(), "Current J%d angle: %f", i + 1, joint_group_positions[i]);
+
+
+	moveit::core::RobotState goal_state(*move_group.getCurrentState());
+	
+	//* STOMP accepts only joint-space goals:
+	// Get joint angles of request->pose using IK
+	if (!goal_state.setFromIK(joint_model_group, request->pose))
+	{
+		RCLCPP_ERROR(node_->get_logger(), "Failed IK");
+		response->valid = false;
+		return;
+	} 
+
+	// Fill goal_state joint positions with joint positions calculated from setFromIk()
+	goal_state.copyJointGroupPositions(joint_model_group, joint_group_positions);
+
+
+	// Set speed/accel scaling factors
+	float vel_scaling_factor = (float) (request->speed / 100.0);
+	move_group.setMaxVelocityScalingFactor(vel_scaling_factor);
+	move_group.setMaxAccelerationScalingFactor(0.5);
+
+
+	bool within_bounds = move_group.setJointValueTarget(joint_group_positions);
+	if (!within_bounds)
+		RCLCPP_WARN(node_->get_logger(), "Target joint position(s) were outside of limits, but we will plan and clamp to the limits ");
+
+
+	// Generate motion plan from joint value targets
+	bool success = (move_group.plan(plan_) == moveit::core::MoveItErrorCode::SUCCESS);
+
+
+	if (success)
+	{
+		RCLCPP_INFO(node_->get_logger(), "Motion plan successful!\n");
+		response->valid = true;
+	}
+	else
+	{
+		RCLCPP_ERROR(node_->get_logger(), "Motion plan failed\n");
+		response->valid = false;
+	}
+
+
+}
+
+
 void ArmMoveGroup::pose_array_cb_(zeroerr_msgs::msg::PoseTargetArray::SharedPtr pose_array_msg)
 {
 	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
@@ -244,62 +322,6 @@ void ArmMoveGroup::pose_array_cb_(zeroerr_msgs::msg::PoseTargetArray::SharedPtr 
 		move_group.clearPathConstraints();
 	}
 
-}
-
-
-void ArmMoveGroup::pose_cb_(zeroerr_msgs::msg::PoseTarget::SharedPtr goal_msg)
-{
-	RCLCPP_INFO(node_->get_logger(), "Pose goal receieved.");
-	pose_goal_recv_ = true;
-	linear_trajectory_recv_ = false;
-	joint_space_goal_recv_ = false;
-
-	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
-
-	//! STOMP planner accepts only joint-space goals!
-	move_group.setPlanningPipelineId("stomp");
-
-	move_group.startStateMonitor(2.0);
-	moveit::core::RobotStatePtr current_state = move_group.getCurrentState();
-	moveit::core::RobotState start_state(*move_group.getCurrentState());
-	move_group.setStartState(start_state);
-
-	const moveit::core::JointModelGroup* joint_model_group =
-      move_group.getCurrentState()->getJointModelGroup(PLANNING_GROUP);
-
-	std::vector<double> joint_group_positions;
-	current_state->copyJointGroupPositions(joint_model_group, joint_group_positions);
-
-	// for (uint i = 0; i < NUM_JOINTS; i++)
-	// 	RCLCPP_INFO(node_->get_logger(), "Current J%d angle: %f", i + 1, joint_group_positions[i]);
-
-	moveit::core::RobotState goal_state(*move_group.getCurrentState());
-	
-	if (!goal_state.setFromIK(joint_model_group, goal_msg->pose))
-	{
-		RCLCPP_ERROR(node_->get_logger(), "Failed to setfromik");
-		return;
-	} 
-
-	goal_state.copyJointGroupPositions(joint_model_group, joint_group_positions);
-
-	float vel_scaling_factor = (float) (goal_msg->speed / 100.0);
-	move_group.setMaxVelocityScalingFactor(vel_scaling_factor);
-	move_group.setMaxAccelerationScalingFactor(0.5);
-
-	// move_group.setPoseTarget(goal_msg->pose);
-	bool within_bounds = move_group.setJointValueTarget(joint_group_positions);
-	if (!within_bounds)
-	{
-		RCLCPP_WARN(node_->get_logger(), "Target joint position(s) were outside of limits, but we will plan and clamp to the limits ");
-	}
-
-	bool success = (move_group.plan(plan_) == moveit::core::MoveItErrorCode::SUCCESS);
-
-	if (success)
-		RCLCPP_INFO(node_->get_logger(), "Motion plan successful!\n");
-	else
-		RCLCPP_ERROR(node_->get_logger(), "Motion plan failed\n");
 }
 
 

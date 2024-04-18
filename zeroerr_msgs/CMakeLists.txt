@@ -17,8 +17,9 @@ set(msg_files
   "msg/PoseTargetArray.msg"
   "msg/PoseTarget.msg"
   "srv/JointSpaceGoal.srv"
-  "srv/Save.srv"
   "srv/MoveToSaved.srv"
+  "srv/PoseGoal.srv"
+  "srv/Save.srv"
 )
 
 rosidl_generate_interfaces(

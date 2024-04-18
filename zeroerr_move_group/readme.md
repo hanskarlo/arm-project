@@ -3,7 +3,7 @@
   - [Description](#description)
   - [Features](#features)
     - [Generate motion plan to joint space goal `arm/JointSpaceGoal`](#generate-motion-plan-to-joint-space-goal-armjointspacegoal)
-    - [Generate motion plan to pose goal `arm/PointGoal`](#generate-motion-plan-to-pose-goal-armpointgoal)
+    - [Generate motion plan to pose goal `arm/PoseGoal`](#generate-motion-plan-to-pose-goal-armposegoal)
     - [Generate motion plan via array of end-effector poses (i.e. trajectory) `arm/PoseGoalArray`](#generate-motion-plan-via-array-of-end-effector-poses-ie-trajectory-armposegoalarray)
     - [Execute motion plan `arm/Execute`](#execute-motion-plan-armexecute)
     - [Stop arm `arm/Stop`](#stop-arm-armstop)
@@ -32,9 +32,9 @@ ros2 service call /arm/JointSpaceGoal zeroerr_msgs/srv/JointSpaceGoal '{speed: 1
 ```
 
 
-### Generate motion plan to pose goal `arm/PointGoal`
+### Generate motion plan to pose goal `arm/PoseGoal`
 
-The following command generates a motion plan at **5% of max speed** to coordinates:
+The following command generates a motion plan at **30% of max speed** to coordinates:
 - x: $0.2$m
 - y: $-0.5$m
 - z: $0.8$m
@@ -46,7 +46,8 @@ with quaternion orientation:
 - w: $\sqrt{2}/2$
 
 ```bash
-ros2 topic pub --once /arm/PoseGoal zeroerr_msgs/msg/PoseTarget '{speed: 5, pose: {position: {x: 0.2, y: -0.5, z: 0.8}, orientation: {x: 0.0, y: 0.0, z: -0.7071, w: 0.7071}}}'
+ros2 service call /arm/PoseGoal zeroerr_msgs/srv/PoseGoal '{speed: 30, pose: {position: {x: 0.2, y: -0.5, z: 0.8}, orientation: {x: 0.0, y: 0.0, 
+z: -0.7071, w: 0.7071}}}'
 ```
 
 <br>
