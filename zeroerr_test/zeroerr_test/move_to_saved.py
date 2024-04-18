@@ -1,41 +1,41 @@
 import rclpy
 from rclpy.node import Node
 
-from zeroerr_msgs.srv import Save
+from zeroerr_msgs.srv import MoveToSaved
 
 SAVE_DIR = "/home/aroarm0/arm_ws/src/zeroerr_arm/zeroerr_test/saved/"
 
-class SaveTest(Node):
+class MoveToSavedTest(Node):
         
     def __init__(self):
-        super().__init__('save_test_node')
+        super().__init__('move_to_saved_test_node')
 
         # Save feature client
-        self.save_client_ = self.create_client(Save, "arm/Save")
+        self.client_ = self.create_client(MoveToSaved, "arm/ExecuteSaved")
 
-        while not self.save_client_.wait_for_service(timeout_sec=5.0):
+        while not self.client_.wait_for_service(timeout_sec=5.0):
             self.get_logger().info('Save service not available, waiting again...')
 
-        rq = Save.Request()
-        rq.type = input("Saving 'pose' or 'trajectory'?: ")
-        rq.label = input("Label for pose/trajectory?: ")
+        rq = MoveToSaved.Request()
+        rq.type = input("'pose' or 'trajectory'? ")
+        rq.label = input(f"Input {rq.type} label: ")
 
         self.get_logger().info("Making service call...")
-        future_response = self.save_client_.call_async(rq)
+        future_response = self.client_.call_async(rq)
 
         rclpy.spin_until_future_complete(self, future_response)
 
         if future_response.result:
-            self.get_logger().info("Save service successful!")
+            self.get_logger().info("ExecuteSaved service successful!")
         else:
-            self.get_logger().error("Save service failed")
+            self.get_logger().error("ExecuteSaved service failed")
         
 
 
 def main(args=None):
     rclpy.init(args=args)
 
-    node = SaveTest()
+    node = MoveToSavedTest()
 
     try:
         rclpy.spin(node)

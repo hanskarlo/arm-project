@@ -425,37 +425,45 @@ void ArmMoveGroup::save_cb_(
 
 		current_state->copyJointGroupPositions(joint_model_group, current_joint_positions);
 
-
 		// for (uint i = 0; i < NUM_JOINTS; i++)
 		// 	RCLCPP_INFO(node_->get_logger(), "J%d: %f", (i + 1), joint_group_positions[i]);
+
+
+		SerializedPose sp;
+		sp.joint_positions = current_joint_positions;
 	
 
 		//* Serialize current pose data and save into json
 		std::string file_name = POSE_DIR;
-		file_name.append(request->label);
-		file_name.append(".pose");
+		file_name.append(label);
+		file_name.append(".pose.json");
+
+		RCLCPP_INFO(node_->get_logger(), "Saving pose into: %s", file_name.c_str());
+
 		{
-			std::ofstream os(file_name.c_str(), std::ios::binary);
+			std::ofstream os(file_name.c_str());
 			cereal::JSONOutputArchive oa(os);
 
-			oa( cereal::make_nvp(label.c_str(), current_joint_positions) );
+			oa( cereal::make_nvp(label.c_str(), sp) );
 		}
 
-		std::vector<double> joint_group_positions_temp;
+
+		// std::vector<double> joint_group_positions_temp;
+		SerializedPose sp_temp;
 		{
-			std::ifstream is(file_name.c_str(), std::ios::binary);
+			std::ifstream is(file_name.c_str(), std::ios::in);
 			cereal::JSONInputArchive ia(is);
 
-			ia(joint_group_positions_temp);
+			ia( sp_temp );
 		}
 
 
 		RCLCPP_INFO(node_->get_logger(), "Reading back saved pose: ");
 		for (uint i = 0; i < NUM_JOINTS; i++)
-			RCLCPP_INFO(node_->get_logger(), "J%d: %f", (i + 1), joint_group_positions_temp[i]);
+			RCLCPP_INFO(node_->get_logger(), "J%d: %f", (i + 1), sp_temp.joint_positions[i]);
 			
 
-		if (!memcmp(&current_joint_positions.front(), &joint_group_positions_temp.front(), (size_t) NUM_JOINTS))
+		if (!memcmp(&current_joint_positions.front(), &sp_temp.joint_positions.front(), (size_t) NUM_JOINTS))
 		{
 			RCLCPP_INFO(node_->get_logger(), "Pose successfully saved into %s", file_name.c_str());
 			response->saved = true;
@@ -466,38 +474,37 @@ void ArmMoveGroup::save_cb_(
 			response->saved = false;
 		}
 
-
 	}
 	else if (!strcmp(type.c_str(), "trajectory"))
 	{
 		size_t num_points = plan_.trajectory.joint_trajectory.points.size();
 		
+		// Create SerializedTrajectory obj and allocate appropriate size for vectors
 		SerializedTrajectory st;
 		st.points.resize(num_points);
+		st.joint_names.resize(NUM_JOINTS);
 		st.sec.resize(num_points);
 		st.nanosec.resize(num_points);
 
 		RCLCPP_INFO(node_->get_logger(), "Saving trajectory with %lu points.", num_points);
-		// RCLCPP_INFO(node_->get_logger(), "50th point: [%f %f %f %f %f %f] (time from start: %ds %uns)",
-		// plan_.trajectory.joint_trajectory.points[49].positions[0],
-		// plan_.trajectory.joint_trajectory.points[49].positions[1],
-		// plan_.trajectory.joint_trajectory.points[49].positions[2],
-		// plan_.trajectory.joint_trajectory.points[49].positions[3],
-		// plan_.trajectory.joint_trajectory.points[49].positions[4],
-		// plan_.trajectory.joint_trajectory.points[49].positions[5],
-		// plan_.trajectory.joint_trajectory.points[49].time_from_start.sec,
-		// plan_.trajectory.joint_trajectory.points[49].time_from_start.nanosec);
 
-		// for (uint i = 0; i < num_points; i++)
-		// {
-		// 	st.points[i].reserve(NUM_JOINTS);
-		// 	st.points[i] = plan_.trajectory.joint_trajectory.points[i].positions;
-		// 	st.sec[i] = plan_.trajectory.joint_trajectory.points[i].time_from_start.sec;
-		// 	st.nanosec[i] = plan_.trajectory.joint_trajectory.points[i].time_from_start.nanosec;
-		// }
+		// Copy over joint names
+		std::vector< std::string > joint_names_ = plan_.trajectory.joint_trajectory.joint_names;
+		for (uint i = 0; i < NUM_JOINTS; i++)
+			st.joint_names[i] = joint_names_[i];
 
-		//* Serialize trajectory data and save into binary
-		std::string file_name = request->label;
+		// Copy over point joint positions and time stamps
+		for (uint i = 0; i < num_points; i++)
+		{
+			st.points[i].reserve(NUM_JOINTS);
+			st.points[i] = plan_.trajectory.joint_trajectory.points[i].positions;
+			st.sec[i] = plan_.trajectory.joint_trajectory.points[i].time_from_start.sec;
+			st.nanosec[i] = plan_.trajectory.joint_trajectory.points[i].time_from_start.nanosec;
+		}
+
+		// Serialize trajectory object and save into binary
+		std::string file_name = TRAJ_DIR;
+		file_name.append(label);
 		file_name.append(".trajectory");
 		{
 			std::ofstream os(file_name.c_str(), std::ios::binary);
@@ -506,14 +513,13 @@ void ArmMoveGroup::save_cb_(
 			oa( st );
 		}
 
-		
+		response->saved = true;
 	}
 	else
 	{
 		RCLCPP_ERROR(node_->get_logger(), "Save request unrecognized!");
 		response->saved = false;
 	}
-
 }
 
 
@@ -521,42 +527,112 @@ void ArmMoveGroup::execute_saved_cb_(
 	const std::shared_ptr<MoveToSaved::Request> request, 
 	std::shared_ptr<MoveToSaved::Response> response)
 {
-	// Get user-selected saved trajectory
+	// Start move group interface
+	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+
+
+	// Pose or trajectory
+	const std::string type = request->type;
+
+	// Get user-selected pose/trajectory
 	const std::string label = request->label;
 
-	// Read saved trajectory
-	SerializedTrajectory st;
-	{
-		std::ifstream is(label.c_str(), std::ios::binary);
-		cereal::BinaryInputArchive ia(is);
 
-		ia(st);
+	if (!strcmp(type.c_str(), "pose"))
+	{
+		std::string file_path = POSE_DIR;
+		file_path.append(label);
+		file_path.append(".pose.json");
+
+
+		// TODO: make sure file exists before loading archive
+		// Create and load serialized pose obj
+		SerializedPose sp;
+		{
+			std::ifstream is(file_path.c_str(), std::ios::in);
+			cereal::JSONInputArchive ia(is);
+
+			ia( sp );
+		}
+
+		bool within_bounds = move_group.setJointValueTarget(sp.joint_positions);
+		if (!within_bounds)
+		{
+			RCLCPP_WARN(node_->get_logger(), "Target joint position(s) were outside of limits, but we will plan and clamp to the limits ");
+		}
+
+		bool success = (move_group.plan(plan_) == moveit::core::MoveItErrorCode::SUCCESS);
+
+		if (success)
+		{
+			RCLCPP_INFO(node_->get_logger(), "Motion plan successful!\n");
+			response->executed = true;
+		}
+		else
+		{
+			RCLCPP_ERROR(node_->get_logger(), "Motion plan failed\n");
+			response->executed = false;
+		}
 	}
-
-	// 
-	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
-	moveit_msgs::msg::RobotTrajectory trajectory;
-
-	trajectory.joint_trajectory.header.frame_id = move_group.getPoseReferenceFrame();
-	trajectory.joint_trajectory.header.stamp = node_->now();
-
-	for (uint i = 0; i < st.points.size(); i++)
+	else if (!strcmp(type.c_str(), "trajectory"))
 	{
-		trajectory.joint_trajectory.points[i].positions = st.points[i];
-		trajectory.joint_trajectory.points[i].time_from_start.sec = st.sec[i];
-		trajectory.joint_trajectory.points[i].time_from_start.nanosec = st.nanosec[i];
-	}
+		std::string file_path = TRAJ_DIR;
+		file_path.append(label);
+		file_path.append(".trajectory");
 
-	RCLCPP_INFO(node_->get_logger(), "Attempting to execute saved trajectory...");
-	
-	if (move_group.asyncExecute(trajectory) == moveit::core::MoveItErrorCode::SUCCESS)
-	{
-		RCLCPP_INFO(node_->get_logger(), "Success!");
-		response->executed = true;
+		// TODO: make sure file exists before loading archive
+		// Read saved trajectory
+		SerializedTrajectory st;
+		{
+			std::ifstream is(file_path.c_str(), std::ios::binary);
+			cereal::BinaryInputArchive ia(is);
+
+			ia( st );
+		}
+
+		RCLCPP_INFO(node_->get_logger(), "Loaded trajectory with %lu points", st.points.size());
+		
+
+		moveit_msgs::msg::RobotTrajectory trajectory;
+		trajectory.joint_trajectory.joint_names.resize(NUM_JOINTS);
+		trajectory.joint_trajectory.points.resize(st.points.size());
+
+		// RCLCPP_INFO(node_->get_logger(), "Setting frame_id: %s", move_group.getPlanningFrame().c_str());
+		trajectory.joint_trajectory.header.frame_id = move_group.getPlanningFrame();
+
+		// RCLCPP_INFO(node_->get_logger(), "Setting stamp: %f", node_->now().seconds());
+		trajectory.joint_trajectory.header.stamp = node_->now();
+
+		for (uint i = 0; i < NUM_JOINTS; i++)
+			trajectory.joint_trajectory.joint_names[i] = st.joint_names[i];
+
+
+		for (uint i = 0; i < st.points.size(); i++)
+		{
+			trajectory.joint_trajectory.points[i].positions = st.points[i];
+			trajectory.joint_trajectory.points[i].time_from_start.sec = st.sec[i];
+			trajectory.joint_trajectory.points[i].time_from_start.nanosec = st.nanosec[i];
+		}
+
+		RCLCPP_INFO(node_->get_logger(), "Attempting to execute saved trajectory...");
+		
+		// TODO: preview motion plan before moving
+
+		if (move_group.execute(trajectory) == moveit::core::MoveItErrorCode::SUCCESS)
+		{
+			RCLCPP_INFO(node_->get_logger(), "Success!");
+			response->executed = true;
+		}
+		else
+		{
+			RCLCPP_ERROR(node_->get_logger(), "Execution failed");
+			response->executed = false;
+		}
+
 	}
 	else
 	{
-		RCLCPP_ERROR(node_->get_logger(), "Execution failed");
+		RCLCPP_ERROR(node_->get_logger(), "Invalid type!");
 		response->executed = false;
 	}
 

@@ -22,6 +22,7 @@ setup(
         'console_scripts': [
             'move_group_test = zeroerr_test.move_group_test:main',
             'save_test = zeroerr_test.save_test:main',
+            'move_to_saved = zeroerr_test.move_to_saved:main',
         ],
     },
 )

@@ -5,6 +5,7 @@
 #include <cereal/archives/binary.hpp>
 #include <cereal/archives/json.hpp>
 #include <cereal/types/vector.hpp>
+#include <cereal/types/string.hpp>
 #include <cereal/access.hpp>
 
 #include <rclcpp/rclcpp.hpp>
@@ -46,9 +47,9 @@ class ArmMoveGroup
         const std::string PLANNING_GROUP = "arm_group";
         const std::string NODE_NAME = "arm_move_group";
 
-        const std::string PKG_DIR = "/src/zeroerr_arm/zeroerr_move_group";
-        const std::string POSE_DIR = PKG_DIR + "/poses/";
-        const std::string TRAJ_DIR = PKG_DIR + "/trajectories/";
+        const std::string PKG_DIR = "/home/arodev0/arm_ws/src/zeroerr_arm/zeroerr_move_group/";
+        const std::string POSE_DIR = PKG_DIR + "poses/";
+        const std::string TRAJ_DIR = PKG_DIR + "trajectories/";
 
         bool joint_space_goal_recv_ = false;
         bool pose_goal_recv_ = false;
@@ -95,11 +96,25 @@ class ArmMoveGroup
         moveit::planning_interface::MoveGroupInterface::Plan plan_;
         moveit::planning_interface::PlanningSceneInterface planning_scene_interface_;
 
+        struct SerializedPose
+        {
+            std::vector<double> joint_positions;
+
+            template <class Archive>
+            void serialize(Archive & archive)
+            {
+                archive( CEREAL_NVP(joint_positions) );
+            }
+        
+        };
 
         struct SerializedTrajectory
         {   
             // Joint trajectory positions
             std::vector< std::vector<double> > points;
+
+            // Joint names
+            std::vector< std::string > joint_names;
 
             // Time from start
             std::vector<int32_t> sec;
@@ -108,7 +123,7 @@ class ArmMoveGroup
             template<class Archive>
             void serialize(Archive & archive)
             {
-                archive( points, sec, nanosec );
+                archive( points, joint_names, sec, nanosec );
             }
         };
 
