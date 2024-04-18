@@ -25,23 +25,6 @@ ArmMoveGroup::ArmMoveGroup()
 		std::bind(&ArmMoveGroup::pose_array_cb_, this, _1)
 	);
 
-	pose_sub_ = node_->create_subscription<zeroerr_msgs::msg::PoseTarget>(
-		"arm/PoseGoal",
-		rclcpp::QoS(10),
-		std::bind(&ArmMoveGroup::pose_cb_, this, _1)
-	);
-
-	arm_execute_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
-		"arm/Execute",
-		rclcpp::QoS(1),
-		std::bind(&ArmMoveGroup::execute_cb_, this, _1)
-	);
-
-	arm_stop_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
-		"arm/Stop",
-		rclcpp::QoS(1),
-		std::bind(&ArmMoveGroup::stop_cb_, this, _1)
-	);
 
 	arm_clear_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
 		"arm/Clear",
@@ -49,6 +32,16 @@ ArmMoveGroup::ArmMoveGroup()
 		std::bind(&ArmMoveGroup::clear_cb_, this, _1)
 	);
 
+	
+	execute_srv_ = node_->create_service<Trigger>(
+		"arm/Execute",
+		std::bind(&ArmMoveGroup::execute_cb_, this, _1, _2)
+	);
+
+	stop_srv_ = node_->create_service<Trigger>(
+		"arm/Stop",
+		std::bind(&ArmMoveGroup::stop_cb_, this, _1, _2)
+	);
 
 	joint_space_goal_srv_ = node_->create_service<JointSpaceGoal>(
 		"arm/JointSpaceGoal",
@@ -325,54 +318,27 @@ void ArmMoveGroup::pose_array_cb_(zeroerr_msgs::msg::PoseTargetArray::SharedPtr 
 }
 
 
-void ArmMoveGroup::execute_cb_(const std_msgs::msg::Bool::SharedPtr execute_msg)
-{
-	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
-	move_group.startStateMonitor(2.0);
-	move_group.setStartStateToCurrentState();
-
-	if (execute_msg->data)
-	{
-		if (linear_trajectory_recv_)
-		{
-			if (move_group.asyncExecute(trajectory_) == moveit::core::MoveItErrorCode::SUCCESS)
-				RCLCPP_INFO(node_->get_logger(), "Linear trajectory motion plan executed!\n");
-			else
-				RCLCPP_ERROR(node_->get_logger(), "Motion execution failed\n");
-		}
-		else
-		{
-			if (move_group.asyncExecute(plan_) == moveit::core::MoveItErrorCode::SUCCESS)
-				RCLCPP_INFO(node_->get_logger(), "Motion plan executed!\n");
-			else
-				RCLCPP_ERROR(node_->get_logger(), "Motion execution failed\n");
-		}
-	}
-	else
-	{
-		move_group.stop();
-		RCLCPP_INFO(node_->get_logger(), "Motion plan execution stopped!\n");
-	}
-
-	joint_space_goal_recv_ = false;
-	pose_goal_recv_ = false;
-	linear_trajectory_recv_ = false;
-}
-
-
-void ArmMoveGroup::stop_cb_(const std_msgs::msg::Bool::SharedPtr stop_msg)
+void ArmMoveGroup::stop_cb_(
+	const std::shared_ptr<Trigger::Request> request, 
+	std::shared_ptr<Trigger::Response> response)
 {
 	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
 
-	if (stop_msg->data)
+	try
 	{
 		move_group.stop();
 		RCLCPP_INFO(node_->get_logger(), "Motion plan execution stopped!\n");
+		response->message = "Motion plan execution stopped!\n";
+		response->success = true;
 	}
-
-	joint_space_goal_recv_ = false;
-	pose_goal_recv_ = false;
-	linear_trajectory_recv_ = false;
+	catch(const std::exception& e)
+	{
+		RCLCPP_ERROR(node_->get_logger(), "Exception caught attempting stop: %s", e.what());
+		response->message = e.what();
+		response->success = false;
+	}
+	
+	
 }
 
 
@@ -547,6 +513,51 @@ void ArmMoveGroup::save_cb_(
 	}
 }
 
+void ArmMoveGroup::execute_cb_(
+	const std::shared_ptr<Trigger::Request> request, 
+	std::shared_ptr<Trigger::Response> response)
+{
+
+	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+	move_group.startStateMonitor(2.0);
+	move_group.setStartStateToCurrentState();
+
+
+	if (linear_trajectory_recv_)
+	{
+		if (move_group.asyncExecute(trajectory_) == moveit::core::MoveItErrorCode::SUCCESS)
+		{
+			RCLCPP_INFO(node_->get_logger(), "Linear trajectory motion plan executed!\n");
+			response->message = "Linear trajectory motion plan executed!\n";
+			response->success = true;
+		}
+		else
+		{
+			RCLCPP_ERROR(node_->get_logger(), "Motion execution failed\n");
+			response->message = "Motion execution failed";
+			response->success = false;
+		}
+		
+		linear_trajectory_recv_ = false;
+	}
+	else
+	{
+		if (move_group.asyncExecute(plan_) == moveit::core::MoveItErrorCode::SUCCESS)
+		{
+			RCLCPP_INFO(node_->get_logger(), "Motion plan executed!\n");
+			response->message = "Motion plan executed!\n";
+			response->success = true;
+		}
+		else
+		{
+			RCLCPP_ERROR(node_->get_logger(), "Motion execution failed\n");
+			response->message = "Motion execution failed";
+			response->success = false;
+		}
+	}
+
+
+}
 
 void ArmMoveGroup::execute_saved_cb_(
 	const std::shared_ptr<MoveToSaved::Request> request, 

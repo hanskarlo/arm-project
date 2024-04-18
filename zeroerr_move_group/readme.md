@@ -112,7 +112,7 @@ ros2 topic pub --once /arm/PoseGoalArray zeroerr_msgs/msg/PoseTargetArray '{type
 
 To execute a generated motion plan:
 ```bash
-ros2 topic pub --once /arm/Execute std_msgs/msg/Bool '{data: True}'
+ros2 service call /arm/Execute std_srvs/srv/Trigger
 ```
 
 <br>
@@ -121,10 +121,7 @@ ros2 topic pub --once /arm/Execute std_msgs/msg/Bool '{data: True}'
 
 To stop current execution of the arm:
 ```bash
-ros2 topic pub --once /arm/Stop std_msgs/msg/Bool '{data: True}'
-
-# or
-ros2 topic pub --once /arm/Execute std_msgs/msg/Bool '{data: False}'
+ros2 service call /arm/Stop std_srvs/srv/Trigger
 ```
 
 <br>
