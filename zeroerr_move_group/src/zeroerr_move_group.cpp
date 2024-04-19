@@ -112,7 +112,9 @@ void ArmMoveGroup::coll_obj_cb_(std_msgs::msg::Bool::SharedPtr coll_obj_msg)
 }
 
 
-void ArmMoveGroup::joint_space_goal_cb_(const std::shared_ptr<JointSpaceGoal::Request> request, std::shared_ptr<JointSpaceGoal::Response> response)
+void ArmMoveGroup::joint_space_goal_cb_(
+	const std::shared_ptr<JointSpaceGoal::Request> request, 
+	std::shared_ptr<JointSpaceGoal::Response> response)
 {
 	RCLCPP_INFO(node_->get_logger(), "Joint space goal received.");
 	
@@ -296,6 +298,8 @@ void ArmMoveGroup::pose_goal_array_cb_(
 	}
 	else if(!strcmp(type.c_str(), "arc"))
 	{
+		RCLCPP_INFO(node_->get_logger(), "Arc motion request received.");
+
 		move_group.setPlanningPipelineId("pilz_industrial_motion_planner");
 		move_group.setPlannerId("CIRC");
 
@@ -319,7 +323,7 @@ void ArmMoveGroup::pose_goal_array_cb_(
 		moveit_msgs::msg::PositionConstraint pos_constraint;
 		constraints.name = "center";
 		pos_constraint.header.frame_id = center.header.frame_id;
-		pos_constraint.link_name = move_group.getEndEffectorLink();
+		pos_constraint.link_name = "j6_Link";
 		pos_constraint.constraint_region.primitive_poses.push_back(center.pose);
 		pos_constraint.weight = 1.0;
 		constraints.position_constraints.push_back(pos_constraint);

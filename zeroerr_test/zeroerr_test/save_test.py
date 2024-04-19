@@ -16,12 +16,15 @@ class SaveTest(Node):
         while not self.save_client_.wait_for_service(timeout_sec=5.0):
             self.get_logger().info('Save service not available, waiting again...')
 
-        rq = Save.Request()
-        rq.type = input("Saving 'pose' or 'trajectory'?: ")
-        rq.label = input("Label for pose/trajectory?: ")
+        self.rq = Save.Request()
+    
+    
+    def send_request(self):
+        self.rq.type = input("Saving 'pose' or 'trajectory'?: ")
+        self.rq.label = input("Label for pose/trajectory?: ")
 
         self.get_logger().info("Making service call...")
-        future_response = self.save_client_.call_async(rq)
+        future_response = self.save_client_.call_async(self.rq)
 
         rclpy.spin_until_future_complete(self, future_response)
 
@@ -37,10 +40,7 @@ def main(args=None):
 
     node = SaveTest()
 
-    try:
-        rclpy.spin(node)
-    except Exception as e:
-        print(f"Caught exception during spin: {e}")
+    node.send_request()
 
     node.destroy_node()
     rclpy.shutdown()
