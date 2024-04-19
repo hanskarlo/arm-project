@@ -14,11 +14,10 @@ find_package(shape_msgs REQUIRED)
 
 set(msg_files
   "msg/CollisionObject.msg"
-  "msg/PoseTargetArray.msg"
-  "msg/PoseTarget.msg"
   "srv/JointSpaceGoal.srv"
   "srv/MoveToSaved.srv"
   "srv/PoseGoal.srv"
+  "srv/PoseGoalArray.srv"
   "srv/Save.srv"
 )
 
@@ -27,7 +26,7 @@ rosidl_generate_interfaces(
   ${msg_files}
   DEPENDENCIES std_msgs geometry_msgs shape_msgs)
 
-ament_export_dependencies(rosidl_default_runtime std_msgs)
+ament_export_dependencies(rosidl_default_runtime std_msgs geometry_msgs shape_msgs)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

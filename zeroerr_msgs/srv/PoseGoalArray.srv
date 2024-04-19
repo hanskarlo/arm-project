@@ -1,0 +1,13 @@
+# Type of movement 'linear' or 'arc'
+string type
+
+# Cartesian path computation parameters
+float32 step_size 0.01
+float32 jump_threshold 0.0
+
+geometry_msgs/Pose[] waypoints
+
+---
+
+# Calculated trajectory success
+bool success

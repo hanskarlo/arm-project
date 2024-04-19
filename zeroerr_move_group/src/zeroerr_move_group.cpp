@@ -19,12 +19,6 @@ ArmMoveGroup::ArmMoveGroup()
 		std::bind(&ArmMoveGroup::coll_obj_cb_, this, _1)
 	);
 
-	pose_array_sub_ = node_->create_subscription<zeroerr_msgs::msg::PoseTargetArray>(
-		"arm/PoseGoalArray",
-		rclcpp::QoS(10),
-		std::bind(&ArmMoveGroup::pose_array_cb_, this, _1)
-	);
-
 
 	arm_clear_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
 		"arm/Clear",
@@ -51,6 +45,11 @@ ArmMoveGroup::ArmMoveGroup()
 	pose_goal_srv_ = node_->create_service<PoseGoal>(
 		"arm/PoseGoal",
 		std::bind(&ArmMoveGroup::pose_goal_cb_, this, _1, _2)
+	);
+
+	pose_goal_array_srv_ = node_->create_service<PoseGoalArray>(
+		"arm/PoseGoalArray",
+		std::bind(&ArmMoveGroup::pose_goal_array_cb_, this, _1, _2)
 	);
 
 	save_srv_ = node_->create_service<Save>(
@@ -80,6 +79,9 @@ ArmMoveGroup::~ArmMoveGroup()
 // void ArmMoveGroup::coll_obj_cb_(zeroerr_msgs::msg::CollisionObject::SharedPtr coll_obj_msg)
 void ArmMoveGroup::coll_obj_cb_(std_msgs::msg::Bool::SharedPtr coll_obj_msg)
 {
+	// Supress compiler warning
+	const auto com = coll_obj_msg;
+
 	RCLCPP_INFO(node_->get_logger(), "Adding collision object!");
 
 	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
@@ -163,7 +165,9 @@ void ArmMoveGroup::joint_space_goal_cb_(const std::shared_ptr<JointSpaceGoal::Re
 }
 
 
-void ArmMoveGroup::pose_goal_cb_(const std::shared_ptr<PoseGoal::Request> request, std::shared_ptr<PoseGoal::Response> response)
+void ArmMoveGroup::pose_goal_cb_(
+	const std::shared_ptr<PoseGoal::Request> request, 
+	std::shared_ptr<PoseGoal::Response> response)
 {
 	RCLCPP_INFO(node_->get_logger(), "PoseGoal service called.");
 
@@ -236,8 +240,11 @@ void ArmMoveGroup::pose_goal_cb_(const std::shared_ptr<PoseGoal::Request> reques
 }
 
 
-void ArmMoveGroup::pose_array_cb_(zeroerr_msgs::msg::PoseTargetArray::SharedPtr pose_array_msg)
+void ArmMoveGroup::pose_goal_array_cb_(
+	const std::shared_ptr<PoseGoalArray::Request> request, 
+	std::shared_ptr<PoseGoalArray::Response> response)
 {
+	// Start move group interface
 	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
 	
 	move_group.startStateMonitor(2.0);
@@ -251,10 +258,10 @@ void ArmMoveGroup::pose_array_cb_(zeroerr_msgs::msg::PoseTargetArray::SharedPtr 
 	std::vector<double> joint_group_positions;
 	current_state->copyJointGroupPositions(joint_model_group, joint_group_positions);
 
-	// for (uint i = 0; i < NUM_JOINTS; i++)
-	// 	RCLCPP_INFO(node_->get_logger(), "Current J%d angle: %f", i + 1, joint_group_positions[i]);
 
-	const std::string type = pose_array_msg->type;
+	// Get type of motion made by pose goal array
+	const std::string type = request->type;
+
 	if (!strcmp(type.c_str(), "linear"))
 	{
 		linear_trajectory_recv_ = true;
@@ -262,20 +269,30 @@ void ArmMoveGroup::pose_array_cb_(zeroerr_msgs::msg::PoseTargetArray::SharedPtr 
 		std::vector<geometry_msgs::msg::Pose> waypoints;
 		// waypoints.push_back(move_group.getCurrentPose().pose);
 
-		RCLCPP_INFO(node_->get_logger(), "Pose array receieved with %lu waypoints.", pose_array_msg->waypoints.size());
+		RCLCPP_INFO(node_->get_logger(), "Pose array receieved with %lu waypoints.", request->waypoints.size());
 		// move_group.setMaxVelocityScalingFactor(0.1);
 
-		for (size_t i = 0; i < pose_array_msg->waypoints.size(); i++)
-			waypoints.push_back(pose_array_msg->waypoints[i]);
+		for (size_t i = 0; i < request->waypoints.size(); i++)
+			waypoints.push_back(request->waypoints[i]);
 		
 		// moveit_msgs::msg::RobotTrajectory trajectory;
 		// const double jump_threshold = 0.0;	// Disable jump threshold
 		// const double eef_step = 0.01; 		// 1cm interpolation resolution
-		const double jump_threshold = pose_array_msg->jump_threshold;
-		const double eef_step = pose_array_msg->step_size;
+		const double jump_threshold = request->jump_threshold;
+		const double eef_step = request->step_size;
 		double fraction = move_group.computeCartesianPath(waypoints, eef_step, jump_threshold, trajectory_);
 
-		RCLCPP_INFO(node_->get_logger(), "Planning cartesian path (%.2f%% achieved)", fraction * 100.0);
+		// If percent of path achieved >= 95%
+		if ((fraction * 100.0) >= 95.0 )
+		{
+			RCLCPP_INFO(node_->get_logger(), "Planning cartesian path (%.2f%% achieved)", fraction * 100.0);
+			response->success = true;
+		}
+		else
+		{
+			RCLCPP_WARN(node_->get_logger(), "Planning cartesian path (%.2f%% achieved)", fraction * 100.0);
+			response->success = false;
+		}
 	}
 	else if(!strcmp(type.c_str(), "arc"))
 	{
@@ -286,35 +303,49 @@ void ArmMoveGroup::pose_array_cb_(zeroerr_msgs::msg::PoseTargetArray::SharedPtr 
 		geometry_msgs::msg::PoseStamped center;
 		geometry_msgs::msg::PoseStamped endpoint;
 
-		center.pose = pose_array_msg->waypoints[0];
+		// First pose in waypoint array used as arc center
+		center.pose = request->waypoints[0];
 		center.header.frame_id = "base_link";
-		endpoint.pose = pose_array_msg->waypoints[1];
+
+		// Second pose used as arc endpoint
+		endpoint.pose = request->waypoints[1];
 		endpoint.header.frame_id = "base_link";
 
-
+		// Set endpoint as pose target
 		move_group.setPoseTarget(endpoint);
 		
-
+		// Add center of circular motion as path constraint
 		moveit_msgs::msg::Constraints constraints;
 		moveit_msgs::msg::PositionConstraint pos_constraint;
 		constraints.name = "center";
 		pos_constraint.header.frame_id = center.header.frame_id;
-		pos_constraint.link_name = "j6_Link";
+		pos_constraint.link_name = move_group.getEndEffectorLink();
 		pos_constraint.constraint_region.primitive_poses.push_back(center.pose);
 		pos_constraint.weight = 1.0;
 		constraints.position_constraints.push_back(pos_constraint);
 		move_group.setPathConstraints(constraints);
 
+		// Generate motion plan
 		bool success = (move_group.plan(plan_) == moveit::core::MoveItErrorCode::SUCCESS);
 
 		if (success)
+		{
 			RCLCPP_INFO(node_->get_logger(), "Motion plan successful!\n");
+			response->success = true;
+		}
 		else
+		{
 			RCLCPP_ERROR(node_->get_logger(), "Motion plan failed\n");
+			response->success = false;
+		}
 
 		move_group.clearPathConstraints();
 	}
-
+	else
+	{
+		RCLCPP_ERROR(node_->get_logger(), "Unrecognized pose goal array type (%s), see PoseGoalArray.srv", type.c_str());
+		response->success = false;
+	}
 }
 
 
@@ -322,6 +353,9 @@ void ArmMoveGroup::stop_cb_(
 	const std::shared_ptr<Trigger::Request> request, 
 	std::shared_ptr<Trigger::Response> response)
 {
+	// Supress compiler warning
+	const auto rq = request;
+
 	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
 
 	try
@@ -513,10 +547,13 @@ void ArmMoveGroup::save_cb_(
 	}
 }
 
+
 void ArmMoveGroup::execute_cb_(
 	const std::shared_ptr<Trigger::Request> request, 
 	std::shared_ptr<Trigger::Response> response)
 {
+	// Supress compiler warning
+	const auto rq = request;
 
 	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
 	move_group.startStateMonitor(2.0);
@@ -558,6 +595,7 @@ void ArmMoveGroup::execute_cb_(
 
 
 }
+
 
 void ArmMoveGroup::execute_saved_cb_(
 	const std::shared_ptr<MoveToSaved::Request> request, 

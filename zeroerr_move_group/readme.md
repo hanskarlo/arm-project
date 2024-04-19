@@ -4,7 +4,7 @@
   - [Features](#features)
     - [Generate motion plan to joint space goal `arm/JointSpaceGoal`](#generate-motion-plan-to-joint-space-goal-armjointspacegoal)
     - [Generate motion plan to pose goal `arm/PoseGoal`](#generate-motion-plan-to-pose-goal-armposegoal)
-    - [Generate motion plan via array of end-effector poses (i.e. trajectory) `arm/PoseGoalArray`](#generate-motion-plan-via-array-of-end-effector-poses-ie-trajectory-armposegoalarray)
+    - [Generate motion plan via array of end-effector pose waypoints (i.e. trajectory) `arm/PoseGoalArray`](#generate-motion-plan-via-array-of-end-effector-pose-waypoints-ie-trajectory-armposegoalarray)
     - [Execute motion plan `arm/Execute`](#execute-motion-plan-armexecute)
     - [Stop arm `arm/Stop`](#stop-arm-armstop)
     - [Clear current motion plan `arm/Clear`](#clear-current-motion-plan-armclear)
@@ -54,11 +54,11 @@ z: -0.7071, w: 0.7071}}}'
 <br>
 
 
-### Generate motion plan via array of end-effector poses (i.e. trajectory) `arm/PoseGoalArray`
+### Generate motion plan via array of end-effector pose waypoints (i.e. trajectory) `arm/PoseGoalArray`
 
 <br>
 
-The topic is of message type `PoseTargetArray` which has parameters:
+The ros2 service is of type `PoseTargetArray` which has parameters:
 - `type`:
   - `'linear'` for linear movements
   - `'arc'` for curved/circular movements
@@ -81,7 +81,7 @@ The following command generates a linear motion plan with the following waypoint
   - z: $0.3$m
 
 ```bash
-ros2 topic pub --once /arm/PoseGoalArray zeroerr_msgs/msg/PoseTargetArray '{type: 'linear', step_size: 0.01, jump_threshold: 0.0, waypoints: {pose: {position: {x: 0.2, y: 0.0, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}, pose: {position: {x: 0.2, y: 0.4, z: 0.3}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}}'
+ros2 service call /arm/PoseGoalArray zeroerr_msgs/srv/PoseTargetArray '{type: 'linear', step_size: 0.01, jump_threshold: 0.0, waypoints: {pose: {position: {x: 0.2, y: 0.0, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}, pose: {position: {x: 0.2, y: 0.4, z: 0.3}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}}'
 ```
 
 <br>

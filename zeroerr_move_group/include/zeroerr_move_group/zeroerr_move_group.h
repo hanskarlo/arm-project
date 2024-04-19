@@ -21,12 +21,12 @@
 #include <moveit_msgs/msg/attached_collision_object.hpp>
 #include <moveit_msgs/msg/collision_object.hpp>
 #include "zeroerr_msgs/msg/collision_object.hpp"
-#include "zeroerr_msgs/msg/pose_target_array.hpp"
 
 #include <std_srvs/srv/trigger.hpp>
 
 #include "zeroerr_msgs/srv/joint_space_goal.hpp"
 #include "zeroerr_msgs/srv/pose_goal.hpp"
+#include "zeroerr_msgs/srv/pose_goal_array.hpp"
 
 #include "zeroerr_msgs/srv/save.hpp"
 #include "zeroerr_msgs/srv/move_to_saved.hpp"
@@ -60,33 +60,34 @@ class ArmMoveGroup
 
         // rclcpp::Subscription<zeroerr_msgs::msg::CollisionObject>::SharedPtr collision_obj_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr collision_obj_sub_;
-        rclcpp::Subscription<zeroerr_msgs::msg::PoseTargetArray>::SharedPtr pose_array_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_clear_sub_;      
 
         moveit_msgs::msg::RobotTrajectory trajectory_;
 
         // void coll_obj_cb_(const zeroerr_msgs::msg::CollisionObject::SharedPtr coll_obj_msg);
         void coll_obj_cb_(const std_msgs::msg::Bool::SharedPtr coll_obj_msg);
-        void pose_array_cb_(zeroerr_msgs::msg::PoseTargetArray::SharedPtr pose_array_msg);
         void clear_cb_(const std_msgs::msg::Bool::SharedPtr clear_msg);
         void timer_cb_();
 
 
-        //* Feature-set services
+        // Feature-set services
         using Save = zeroerr_msgs::srv::Save;
         using MoveToSaved = zeroerr_msgs::srv::MoveToSaved;
         using JointSpaceGoal = zeroerr_msgs::srv::JointSpaceGoal;
         using PoseGoal = zeroerr_msgs::srv::PoseGoal;
+        using PoseGoalArray = zeroerr_msgs::srv::PoseGoalArray;
         using Trigger = std_srvs::srv::Trigger;
-
-        rclcpp::Service<Save>::SharedPtr save_srv_;
-        rclcpp::Service<MoveToSaved>::SharedPtr move_to_saved_srv_;  
 
         rclcpp::Service<Trigger>::SharedPtr execute_srv_;
         rclcpp::Service<Trigger>::SharedPtr stop_srv_;
 
+        rclcpp::Service<Save>::SharedPtr save_srv_;
+        rclcpp::Service<MoveToSaved>::SharedPtr move_to_saved_srv_;  
+
         rclcpp::Service<JointSpaceGoal>::SharedPtr joint_space_goal_srv_;
         rclcpp::Service<PoseGoal>::SharedPtr pose_goal_srv_;
+        rclcpp::Service<PoseGoalArray>::SharedPtr pose_goal_array_srv_;
+
 
         // Service callbacks
         void save_cb_(const std::shared_ptr<Save::Request> request, std::shared_ptr<Save::Response> response);
@@ -95,7 +96,7 @@ class ArmMoveGroup
         void stop_cb_(const std::shared_ptr<Trigger::Request> request, std::shared_ptr<Trigger::Response> response);
         void joint_space_goal_cb_(const std::shared_ptr<JointSpaceGoal::Request> request, std::shared_ptr<JointSpaceGoal::Response> response);
         void pose_goal_cb_(const std::shared_ptr<PoseGoal::Request> request, std::shared_ptr<PoseGoal::Response> response);
-
+        void pose_goal_array_cb_(const std::shared_ptr<PoseGoalArray::Request> request, std::shared_ptr<PoseGoalArray::Response> response);
 
         moveit_msgs::msg::CollisionObject table_;
 
