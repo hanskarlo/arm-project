@@ -11,8 +11,8 @@ ArmMoveGroup::ArmMoveGroup()
 	mg_node_ = rclcpp::Node::make_shared("aro_movegroup_", node_options);
 	node_ = rclcpp::Node::make_shared(NODE_NAME, node_options);
 
-	using namespace std::placeholders;
 
+	using namespace std::placeholders;
 
 	arm_clear_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
 		"arm/Clear",
@@ -78,6 +78,19 @@ void ArmMoveGroup::joint_space_goal_cb_(
 	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
 	move_group.startStateMonitor();
 
+	RCLCPP_INFO(node_->get_logger(), "Planning frame: %s", move_group.getPlanningFrame().c_str());
+	RCLCPP_INFO(node_->get_logger(), "End effector link: %s", move_group.getEndEffectorLink().c_str());
+
+
+	moveit_visual_tools::MoveItVisualTools visual_tools(
+		mg_node_,
+		move_group.getPlanningFrame(),
+		"arm_marker_array",
+		move_group.getRobotModel());
+
+	visual_tools.deleteAllMarkers();
+
+
 	// Use STOMP
 	move_group.setPlanningPipelineId("stomp");
 
@@ -86,9 +99,13 @@ void ArmMoveGroup::joint_space_goal_cb_(
 
 	const moveit::core::JointModelGroup* joint_model_group =
       move_group.getCurrentState()->getJointModelGroup(PLANNING_GROUP);
+	
+	const moveit::core::LinkModel* ee_link = 
+		joint_model_group->getLinkModel(move_group.getEndEffectorLink());
 
 	std::vector<double> joint_group_positions;
 	current_state->copyJointGroupPositions(joint_model_group, joint_group_positions);
+
 
 	for (uint i = 0; i < NUM_JOINTS; i++)
 		joint_group_positions[i] = ((request->joint_pos_deg[i] * PI) / 180); // Deg -> Rad
@@ -110,9 +127,24 @@ void ArmMoveGroup::joint_space_goal_cb_(
 
 	bool success = (move_group.plan(plan_) == moveit::core::MoveItErrorCode::SUCCESS);
 
+
+
 	if (success)
 	{
-		RCLCPP_INFO(node_->get_logger(), "Motion plan successful!\n");
+		bool visualized = visual_tools.publishTrajectoryLine(
+			plan_.trajectory,
+			ee_link,
+			joint_model_group
+		);
+
+		visual_tools.trigger();
+		
+		if (visualized)
+			RCLCPP_INFO(node_->get_logger(), "Motion plan visualized.");
+		else
+			RCLCPP_ERROR(node_->get_logger(), "Motion plan visualization failed\n");
+
+		RCLCPP_INFO(node_->get_logger(), "Motion plan successful!");
 		response->valid = true;
 	}
 	else
@@ -129,10 +161,18 @@ void ArmMoveGroup::pose_goal_cb_(
 {
 	RCLCPP_INFO(node_->get_logger(), "PoseGoal service called.");
 
-
 	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
 
-	//! STOMP planner accepts only joint-space goals!
+	// Setup visual tools
+	moveit_visual_tools::MoveItVisualTools visual_tools(
+		mg_node_,
+		move_group.getPlanningFrame(),
+		"arm_marker_array",
+		move_group.getRobotModel());
+
+	visual_tools.deleteAllMarkers();
+
+
 	move_group.setPlanningPipelineId("stomp");
 
 	move_group.startStateMonitor(2.0);
@@ -145,6 +185,10 @@ void ArmMoveGroup::pose_goal_cb_(
 	
 	const moveit::core::JointModelGroup* joint_model_group =
       move_group.getCurrentState()->getJointModelGroup(PLANNING_GROUP);
+
+	const moveit::core::LinkModel* ee_link = 
+		joint_model_group->getLinkModel(move_group.getEndEffectorLink());
+
 
 	std::vector<double> joint_group_positions;
 	current_state->copyJointGroupPositions(joint_model_group, joint_group_positions);
@@ -187,6 +231,19 @@ void ArmMoveGroup::pose_goal_cb_(
 	{
 		RCLCPP_INFO(node_->get_logger(), "Motion plan successful!\n");
 		response->valid = true;
+
+		bool visualized = visual_tools.publishTrajectoryLine(
+			plan_.trajectory,
+			ee_link,
+			joint_model_group
+		);
+
+		visual_tools.trigger();
+
+		if (visualized)
+			RCLCPP_INFO(node_->get_logger(), "Motion plan visualized.");
+		else
+			RCLCPP_ERROR(node_->get_logger(), "Motion plan visualization failed\n");
 	}
 	else
 	{
@@ -205,6 +262,14 @@ void ArmMoveGroup::pose_goal_array_cb_(
 	// Start move group interface
 	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
 	
+	moveit_visual_tools::MoveItVisualTools visual_tools(
+		mg_node_,
+		move_group.getPlanningFrame(),
+		"arm_marker_array",
+		move_group.getRobotModel());
+
+	visual_tools.deleteAllMarkers();
+
 	move_group.startStateMonitor(2.0);
 	moveit::core::RobotStatePtr current_state = move_group.getCurrentState();
 	moveit::core::RobotState start_state(*move_group.getCurrentState());
@@ -212,6 +277,9 @@ void ArmMoveGroup::pose_goal_array_cb_(
 
 	const moveit::core::JointModelGroup* joint_model_group =
       move_group.getCurrentState()->getJointModelGroup(PLANNING_GROUP);
+	
+	const moveit::core::LinkModel* ee_link = 
+		joint_model_group->getLinkModel(move_group.getEndEffectorLink());
 
 	std::vector<double> joint_group_positions;
 	current_state->copyJointGroupPositions(joint_model_group, joint_group_positions);
@@ -245,6 +313,19 @@ void ArmMoveGroup::pose_goal_array_cb_(
 		{
 			RCLCPP_INFO(node_->get_logger(), "Planning cartesian path (%.2f%% achieved)", fraction * 100.0);
 			response->success = true;
+
+			bool visualized = visual_tools.publishTrajectoryLine(
+				trajectory_,
+				ee_link,
+				joint_model_group
+			);
+
+			visual_tools.trigger();
+		
+			if (visualized)
+				RCLCPP_INFO(node_->get_logger(), "Motion plan visualized.");
+			else
+				RCLCPP_ERROR(node_->get_logger(), "Motion plan visualization failed\n");
 		}
 		else
 		{
@@ -292,6 +373,19 @@ void ArmMoveGroup::pose_goal_array_cb_(
 		{
 			RCLCPP_INFO(node_->get_logger(), "Motion plan successful!\n");
 			response->success = true;
+
+			bool visualized = visual_tools.publishTrajectoryLine(
+				plan_.trajectory,
+				ee_link,
+				joint_model_group
+			);
+
+			visual_tools.trigger();
+		
+		if (visualized)
+			RCLCPP_INFO(node_->get_logger(), "Motion plan visualized.");
+		else
+			RCLCPP_ERROR(node_->get_logger(), "Motion plan visualization failed\n");
 		}
 		else
 		{
