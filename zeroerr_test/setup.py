@@ -22,6 +22,7 @@ setup(
         'console_scripts': [
             'move_group_test = zeroerr_test.move_group_test:main',
             'move_to_saved = zeroerr_test.move_to_saved:main',
+            'planning_scene_test = zeroerr_test.planning_scene_test:main',
             'pga_test = zeroerr_test.pose_goal_array_test:main',
             'save_test = zeroerr_test.save_test:main',
         ],

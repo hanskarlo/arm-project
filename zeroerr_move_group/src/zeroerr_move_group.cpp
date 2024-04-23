@@ -8,16 +8,10 @@ ArmMoveGroup::ArmMoveGroup()
 {
 	rclcpp::NodeOptions node_options;
 	node_options.automatically_declare_parameters_from_overrides(true);
-	mg_node_ = rclcpp::Node::make_shared("mg_node_", node_options);
+	mg_node_ = rclcpp::Node::make_shared("aro_movegroup_", node_options);
 	node_ = rclcpp::Node::make_shared(NODE_NAME, node_options);
 
 	using namespace std::placeholders;
-
-	collision_obj_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
-		"arm/SetupLabEnvironment",
-		rclcpp::QoS(10),
-		std::bind(&ArmMoveGroup::coll_obj_cb_, this, _1)
-	);
 
 
 	arm_clear_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
@@ -69,47 +63,9 @@ ArmMoveGroup::ArmMoveGroup()
 ArmMoveGroup::~ArmMoveGroup()
 {
 	RCLCPP_INFO(node_->get_logger(), "Destruct sequence initiated.");
-
-	table_.operation = table_.REMOVE;
-	planning_scene_interface_.applyCollisionObject(table_);
 }
 
 
-
-// void ArmMoveGroup::coll_obj_cb_(zeroerr_msgs::msg::CollisionObject::SharedPtr coll_obj_msg)
-void ArmMoveGroup::coll_obj_cb_(std_msgs::msg::Bool::SharedPtr coll_obj_msg)
-{
-	// Supress compiler warning
-	const auto com = coll_obj_msg;
-
-	RCLCPP_INFO(node_->get_logger(), "Adding collision object!");
-
-	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
-
-	//* Place table underneath arm
-	table_.header.frame_id = move_group.getPlanningFrame();
-
-	table_.id = "table1";
-
-	shape_msgs::msg::SolidPrimitive primitive;
-	primitive.type = primitive.BOX;
-	primitive.dimensions.resize(3);
-	primitive.dimensions[primitive.BOX_X] = 0.91;
-	primitive.dimensions[primitive.BOX_Y] = 1.54;
-	primitive.dimensions[primitive.BOX_Z] = 0.08;
-
-	geometry_msgs::msg::Pose table_pose;
-	table_pose.orientation.w = 1.0;
-	table_pose.position.x = 0.405;
-	table_pose.position.y = -0.67;
-	table_pose.position.z = -0.07;
-
-	table_.primitives.push_back(primitive);
-	table_.primitive_poses.push_back(table_pose);
-	table_.operation = table_.ADD;
-
-	planning_scene_interface_.applyCollisionObject(table_);
-}
 
 
 void ArmMoveGroup::joint_space_goal_cb_(

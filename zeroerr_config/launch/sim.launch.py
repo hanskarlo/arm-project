@@ -11,7 +11,10 @@ from moveit_configs_utils import MoveItConfigsBuilder
 
 def generate_launch_description():
 
-    # Command-line arguments
+    warehouse_ros_config = {
+        "warehouse_plugin": "warehouse_ros_sqlite:DatabaseConnection",
+        "warehouse_host": "/home/arodev0/arm_ws/src/zeroerr_arm/zeroerr_config/config/wh.sqlite"
+    }
 
     ros2_control_hardware_type = DeclareLaunchArgument(
         "ros2_control_hardware_type",
@@ -39,6 +42,12 @@ def generate_launch_description():
                 "stomp"
             ]
         )
+        # .parameter(
+        #     "warehouse_plugin", "warehouse_ros_sqlite::DatabaseConnection"
+        # )
+        # .parameter(
+        #     "warehouse_host", "/home/arodev0/arm_ws/src/zeroerr_arm/zeroerr_config/config/wh.sqlite"
+        # )
         .to_moveit_configs()
     )
 

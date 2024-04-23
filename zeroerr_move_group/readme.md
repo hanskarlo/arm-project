@@ -28,7 +28,7 @@ The following command generates a motion plan at **10% of max speed** to joint a
 - J6: $90\degree$
 
 ```bash
-ros2 service call /arm/JointSpaceGoal zeroerr_msgs/srv/JointSpaceGoal '{speed: 10, joint_deg: [10, 45, 0, 0, 60, 90]}'
+ros2 service call /arm/JointSpaceGoal zeroerr_msgs/srv/JointSpaceGoal '{speed: 10, joint_pos_deg: [10, 45, 0, 0, 60, 90]}'
 ```
 
 

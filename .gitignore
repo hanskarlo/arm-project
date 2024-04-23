@@ -1,3 +1,4 @@
 .vscode
 *.pose.json
 *.trajectory
+*.scene
