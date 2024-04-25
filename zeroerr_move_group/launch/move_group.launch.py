@@ -7,7 +7,7 @@ def generate_launch_description():
     moveit_config = MoveItConfigsBuilder("zeroerr_arm", package_name="zeroerr_config").to_moveit_configs()
 
     # MoveGroupInterface demo executable
-    move_group_demo = Node(
+    move_group = Node(
         # name="arm_move_group",
         package="zeroerr_move_group",
         executable="zeroerr_move_group",
@@ -20,4 +20,4 @@ def generate_launch_description():
         ],
     )
 
-    return LaunchDescription([move_group_demo])
+    return LaunchDescription([move_group])

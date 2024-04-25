@@ -221,39 +221,39 @@ int KeyboardServo::keyLoop()
     joint_msg->joint_names = { "j1", "j2", "j3", "j4",
                                "j5", "j6"};
 
-    joint_msg->velocities.resize(7);
+    joint_msg->velocities.resize(6);
     std::fill(joint_msg->velocities.begin(), joint_msg->velocities.end(), 0.0);
     // Use read key-press
     switch (c)
     {
       case KEYCODE_LEFT:
         RCLCPP_DEBUG(nh_->get_logger(), "LEFT");
-        twist_msg->twist.linear.y = -0.5;
+        twist_msg->twist.linear.y = -0.1;
         publish_twist = true;
         break;
       case KEYCODE_RIGHT:
         RCLCPP_DEBUG(nh_->get_logger(), "RIGHT");
-        twist_msg->twist.linear.y = 0.5;
+        twist_msg->twist.linear.y = 0.1;
         publish_twist = true;
         break;
       case KEYCODE_UP:
         RCLCPP_DEBUG(nh_->get_logger(), "UP");
-        twist_msg->twist.linear.x = 0.5;
+        twist_msg->twist.linear.x = 0.1;
         publish_twist = true;
         break;
       case KEYCODE_DOWN:
         RCLCPP_DEBUG(nh_->get_logger(), "DOWN");
-        twist_msg->twist.linear.x = -0.5;
+        twist_msg->twist.linear.x = -0.1;
         publish_twist = true;
         break;
       case KEYCODE_PERIOD:
         RCLCPP_DEBUG(nh_->get_logger(), "PERIOD");
-        twist_msg->twist.linear.z = -0.5;
+        twist_msg->twist.linear.z = -0.1;
         publish_twist = true;
         break;
       case KEYCODE_SEMICOLON:
         RCLCPP_DEBUG(nh_->get_logger(), "SEMICOLON");
-        twist_msg->twist.linear.z = 0.5;
+        twist_msg->twist.linear.z = 0.1;
         publish_twist = true;
         break;
       case KEYCODE_1:

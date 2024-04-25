@@ -30,6 +30,7 @@ def generate_launch_description():
             mappings={"ros2_control_hardware_type": LaunchConfiguration("ros2_control_hardware_type")},
         )
         .robot_description_semantic(file_path="config/zeroerr_arm.srdf")
+        .robot_description_kinematics(file_path="config/servo_kinematics.yaml")
         .planning_scene_monitor(
             publish_robot_description=True, 
             publish_robot_description_semantic=True
@@ -71,7 +72,6 @@ def generate_launch_description():
     rviz_node = Node(
         package="rviz2",
         executable="rviz2",
-        name="rviz2",
         output="log",
         arguments=["-d", rviz_config],
         parameters=[
@@ -137,18 +137,15 @@ def generate_launch_description():
         .yaml("config/servo_parameters.yaml")
         .to_dict()
     }
-
-    print(servo_params)
+    # print(servo_params)
 
     # This sets the update rate and planning group name for the acceleration limiting filter.
     acceleration_filter_update_period = {"update_period": 0.01}
     planning_group_name = {"planning_group_name": "arm_group"}
-    move_group_name = {"move_group_name": "arm_group"}
 
     servo_node = Node(
         package="moveit_servo",
         executable="servo_node",
-        name="servo_node",
         parameters=[
             servo_params,
             acceleration_filter_update_period,
