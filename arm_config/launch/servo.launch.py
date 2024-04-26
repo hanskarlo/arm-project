@@ -15,7 +15,7 @@ def generate_launch_description():
     # Use real hardware
     """
     Change hardware type parameter in zeroerr_arm.ros2_control.xacro to use
-    zeroerr_hardware/ArmHardwareInterface plugin (actual hardware)
+    arm_hardware/ArmHardwareInterface plugin (actual hardware)
     """
     ros2_control_hardware_type = DeclareLaunchArgument(
         "ros2_control_hardware_type",
@@ -24,7 +24,7 @@ def generate_launch_description():
     )
 
     moveit_config = (
-        MoveItConfigsBuilder("zeroerr_arm", package_name="zeroerr_config")
+        MoveItConfigsBuilder("zeroerr_arm", package_name="arm_config")
         .robot_description(
             file_path="config/zeroerr_arm.urdf.xacro",
             mappings={"ros2_control_hardware_type": LaunchConfiguration("ros2_control_hardware_type")},
@@ -64,7 +64,7 @@ def generate_launch_description():
 
     # RViz
     rviz_config = os.path.join(
-        get_package_share_directory("zeroerr_config"),
+        get_package_share_directory("arm_config"),
         "config", 
         "moveit.rviz"
     )
@@ -103,7 +103,7 @@ def generate_launch_description():
 
     # ros2_control using FakeSystem as hardware
     ros2_controllers_path = os.path.join(
-        get_package_share_directory("zeroerr_config"),
+        get_package_share_directory("arm_config"),
         "config",
         "ros2_controllers.yaml",
     )
@@ -133,7 +133,7 @@ def generate_launch_description():
 
 
     servo_params = {
-        "moveit_servo": ParameterBuilder("zeroerr_config")
+        "moveit_servo": ParameterBuilder("arm_config")
         .yaml("config/servo_parameters.yaml")
         .to_dict()
     }

@@ -1,4 +1,3 @@
-// #include "zeroerr_hardware/arm_hardware.hpp"
 #include "../include/arm_hardware/arm_hardware.hpp"
 #include "pluginlib/class_list_macros.hpp"
 
@@ -6,7 +5,7 @@
 #define LOG_INFO(msg)  RCLCPP_INFO(rclcpp::get_logger(LOGGER), msg) 
 #define LOG_ERR(msg)   RCLCPP_FATAL(rclcpp::get_logger(LOGGER), msg) 
 
-namespace zeroerr_hardware
+namespace arm_hardware
 {
     hardware_interface::CallbackReturn ArmHardwareInterface::on_init(const hardware_interface::HardwareInfo& info)
     {
@@ -284,4 +283,4 @@ namespace zeroerr_hardware
 
 }
 
-PLUGINLIB_EXPORT_CLASS(zeroerr_hardware::ArmHardwareInterface, hardware_interface::SystemInterface);
+PLUGINLIB_EXPORT_CLASS(arm_hardware::ArmHardwareInterface, hardware_interface::SystemInterface);

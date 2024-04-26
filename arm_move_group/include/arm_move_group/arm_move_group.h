@@ -23,12 +23,12 @@
 
 #include <std_srvs/srv/trigger.hpp>
 
-#include "zeroerr_msgs/srv/joint_space_goal.hpp"
-#include "zeroerr_msgs/srv/pose_goal.hpp"
-#include "zeroerr_msgs/srv/pose_goal_array.hpp"
+#include "arm_msgs/srv/joint_space_goal.hpp"
+#include "arm_msgs/srv/pose_goal.hpp"
+#include "arm_msgs/srv/pose_goal_array.hpp"
 
-#include "zeroerr_msgs/srv/save.hpp"
-#include "zeroerr_msgs/srv/move_to_saved.hpp"
+#include "arm_msgs/srv/save.hpp"
+#include "arm_msgs/srv/move_to_saved.hpp"
 
 
 
@@ -60,25 +60,22 @@ class ArmMoveGroup
         bool pose_goal_recv_ = false;
         bool linear_trajectory_recv_ = false;
 
-        // rclcpp::Subscription<zeroerr_msgs::msg::CollisionObject>::SharedPtr collision_obj_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr collision_obj_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_clear_sub_;      
 
         moveit_msgs::msg::RobotTrajectory trajectory_;
 
-        // void coll_obj_cb_(const zeroerr_msgs::msg::CollisionObject::SharedPtr coll_obj_msg);
-        // void coll_obj_cb_(const std_msgs::msg::Bool::SharedPtr coll_obj_msg);
         void clear_cb_(const std_msgs::msg::Bool::SharedPtr clear_msg);
         void timer_cb_();
 
 
         // Feature-set services
-        using JointSpaceGoal = zeroerr_msgs::srv::JointSpaceGoal;
-        using PoseGoal = zeroerr_msgs::srv::PoseGoal;
-        using PoseGoalArray = zeroerr_msgs::srv::PoseGoalArray;
+        using JointSpaceGoal = arm_msgs::srv::JointSpaceGoal;
+        using PoseGoal = arm_msgs::srv::PoseGoal;
+        using PoseGoalArray = arm_msgs::srv::PoseGoalArray;
         using Trigger = std_srvs::srv::Trigger;
-        using Save = zeroerr_msgs::srv::Save;
-        using MoveToSaved = zeroerr_msgs::srv::MoveToSaved;
+        using Save = arm_msgs::srv::Save;
+        using MoveToSaved = arm_msgs::srv::MoveToSaved;
 
         rclcpp::Service<Trigger>::SharedPtr execute_srv_;
         rclcpp::Service<Trigger>::SharedPtr stop_srv_;

@@ -14,7 +14,7 @@ def generate_launch_description():
     # Use real hardware
     """
     Change hardware type parameter in zeroerr_arm.ros2_control.xacro to use
-    zeroerr_hardware/ArmHardwareInterface plugin (actual hardware)
+    arm_hardware/ArmHardwareInterface plugin (actual hardware)
     """
     ros2_control_hardware_type = DeclareLaunchArgument(
         "ros2_control_hardware_type",
@@ -55,8 +55,8 @@ def generate_launch_description():
     )
 
     arm_interface = Node(
-        package="zeroerr_interface",
-        executable="zeroerr_interface",
+        package="arm_ethercat_interface",
+        executable="arm_ethercat_interface",
         output="screen",
     )
 

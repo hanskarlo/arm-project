@@ -9,7 +9,7 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
 def generate_launch_description():
-    urdf_sandbox_path = get_package_share_path('zeroerr_description')
+    urdf_sandbox_path = get_package_share_path('arm_description')
     default_model_path = urdf_sandbox_path / 'urdf/zeroerr.urdf'
     default_rviz_config_path = urdf_sandbox_path / 'rviz/rviz_basic_settings.rviz'
 

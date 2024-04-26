@@ -11,11 +11,6 @@ from moveit_configs_utils import MoveItConfigsBuilder
 
 def generate_launch_description():
 
-    warehouse_ros_config = {
-        "warehouse_plugin": "warehouse_ros_sqlite:DatabaseConnection",
-        "warehouse_host": "/home/arodev0/arm_ws/src/zeroerr_arm/zeroerr_config/config/wh.sqlite"
-    }
-
     ros2_control_hardware_type = DeclareLaunchArgument(
         "ros2_control_hardware_type",
         default_value="mock_components",
@@ -23,7 +18,7 @@ def generate_launch_description():
     )
 
     moveit_config = (
-        MoveItConfigsBuilder("zeroerr_arm", package_name="zeroerr_config")
+        MoveItConfigsBuilder("zeroerr_arm", package_name="arm_config")
         .robot_description(
             file_path="config/zeroerr_arm.urdf.xacro",
             mappings={"ros2_control_hardware_type": LaunchConfiguration("ros2_control_hardware_type")},
@@ -42,12 +37,6 @@ def generate_launch_description():
                 "stomp"
             ]
         )
-        # .parameter(
-        #     "warehouse_plugin", "warehouse_ros_sqlite::DatabaseConnection"
-        # )
-        # .parameter(
-        #     "warehouse_host", "/home/arodev0/arm_ws/src/zeroerr_arm/zeroerr_config/config/wh.sqlite"
-        # )
         .to_moveit_configs()
     )
 
@@ -62,7 +51,7 @@ def generate_launch_description():
 
     # RViz
     rviz_config = os.path.join(
-        get_package_share_directory("zeroerr_config"),
+        get_package_share_directory("arm_config"),
         "config", 
         "moveit.rviz"
     )
@@ -100,7 +89,7 @@ def generate_launch_description():
 
     # ros2_control using FakeSystem as hardware
     ros2_controllers_path = os.path.join(
-        get_package_share_directory("zeroerr_config"),
+        get_package_share_directory("arm_config"),
         "config",
         "ros2_controllers.yaml",
     )

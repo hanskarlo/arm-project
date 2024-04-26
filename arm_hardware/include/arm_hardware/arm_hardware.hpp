@@ -3,8 +3,8 @@
 // https://control.ros.org/master/doc/getting_started/getting_started.html#overview-hardware-components
 // https://control.ros.org/master/doc/ros2_control/hardware_interface/doc/writing_new_hardware_component.html
 
-#ifndef __ZEROERR_HARDWARE_H__
-#define __ZEROERR_HARDWARE_H__
+#ifndef __ARM_HARDWARE_H__
+#define __ARM_HARDWARE_H__
 
 #include <string>
 #include <unordered_map>
@@ -23,7 +23,7 @@
 
 #include <sensor_msgs/msg/joint_state.hpp>
 
-namespace zeroerr_hardware
+namespace arm_hardware
 {
 
     using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
@@ -157,4 +157,4 @@ namespace zeroerr_hardware
 }
 
 
-#endif // __ZEROERR_HARDWARE_H__
+#endif // __ARM_HARDWARE_H__

@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-        <xacro:macro name="zeroerr_arm_ros2_control" params="name ros2_control_hardware_type">
+        <xacro:macro name="arm_ros2_control" params="name ros2_control_hardware_type">
 
         <ros2_control name="${name}" type="system">
             <hardware>
@@ -8,7 +8,7 @@
                     <plugin>mock_components/GenericSystem</plugin>
                 </xacro:if>
                 <xacro:if value="${ros2_control_hardware_type == 'real'}">
-                    <plugin>zeroerr_hardware/ArmHardwareInterface</plugin>
+                    <plugin>arm_hardware/ArmHardwareInterface</plugin>
                     <param name="command_interface_topic">arm/command</param>
                     <param name="state_interface_topic">arm/state</param>
                 </xacro:if>

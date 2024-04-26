@@ -3,11 +3,11 @@
     <xacro:arg name="ros2_control_hardware_type" default="mock_components" />
 
     <!-- Import zeroerr_arm urdf file -->
-    <xacro:include filename="$(find zeroerr_description)/urdf/zeroerr.urdf" />
+    <xacro:include filename="$(find arm_description)/urdf/zeroerr.urdf" />
 
     <!-- Import control_xacro -->
     <xacro:include filename="zeroerr_arm.ros2_control.xacro" />
 
-    <xacro:zeroerr_arm_ros2_control name="ZeroErrArm" ros2_control_hardware_type="$(arg ros2_control_hardware_type)"/>
+    <xacro:arm_ros2_control name="ArmProject" ros2_control_hardware_type="$(arg ros2_control_hardware_type)"/>
 
 </robot>

@@ -28,7 +28,7 @@ ament_target_dependencies(
   "moveit_core"
   "moveit_msgs"
   "geometry_msgs"
-  "zeroerr_msgs"
+  "arm_msgs"
   "moveit_ros_planning_interface"
   "moveit_visual_tools"
 )
