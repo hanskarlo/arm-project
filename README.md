@@ -1,4 +1,4 @@
-# ZeroErr Arm MoveIt2 Repository
+# Arm Project MoveIt2 Repository
 
 ## About
 This repository hosts the software for ROS2 integration with a 6 DoF 5kg ZeroErr arm for leveraging MoveIt2 features such as motion/trajectory planning, kinematic control, collision checking, and 3D perception.
@@ -32,7 +32,7 @@ The software was tested on an ASUS PN50 with
 Clone the repository **into your MoveIt2 workspace /src folder** 
 ```
 cd /your_moveit2_ws/src
-git clone https:/github.com/hanskarlo/zeroerr_arm.git
+git clone https:/github.com/hanskarlo/arm-project.git
 ```
 
 Source your workspace and build the packages
@@ -48,9 +48,9 @@ Start the EtherCAT Master module:
 sudo /etc/init.d/ethercat start
 ```
 
-Run the zeroerr_interface node:
+Run the arm_ethercat_interface node:
 ```bash
-ros2 run zeroerr_interface zeroerr_interface
+ros2 run arm_ethercat_interface arm_ethercat_interface
 ```
 
 > :exclamation: The node may take some time to configure the actuators to the EtherCAT OP state (see [Known Issues](#known-issues)) 
@@ -59,7 +59,7 @@ ros2 run zeroerr_interface zeroerr_interface
 
 Once all actuators have reached the **Operation enabled** state (CiA402 FSA), launch the MoveIt2 config: 
 ```bash
-ros2 launch zeroerr_config hardware.launch.py
+ros2 launch arm_config hardware.launch.py
 ```
 
 ## ToDo
@@ -68,4 +68,4 @@ ros2 launch zeroerr_config hardware.launch.py
 
 
 ## Known issues
-* The zeroerr_interface node experiences turbulance when initially configuring the EtherCAT slaves (eRob actuators). This stems from a myriad of possible issues (hardware, communication frequency, control frequency).
+* The arm_ethercat_interface node experiences turbulance when initially configuring the EtherCAT slaves (eRob actuators). This stems from a myriad of possible issues (hardware, communication frequency, control frequency).
