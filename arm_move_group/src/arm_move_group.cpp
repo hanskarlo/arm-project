@@ -98,7 +98,7 @@ void ArmMoveGroup::joint_space_goal_cb_(
 	move_group.setStartState(*current_state);
 
 	const moveit::core::JointModelGroup* joint_model_group =
-      move_group.getCurrentState()->getJointModelGroup(PLANNING_GROUP);
+		move_group.getCurrentState()->getJointModelGroup(PLANNING_GROUP);
 	
 	const moveit::core::LinkModel* ee_link = 
 		joint_model_group->getLinkModel(move_group.getEndEffectorLink());
