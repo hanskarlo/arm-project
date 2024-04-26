@@ -14,7 +14,7 @@
 
 ## Description
 
-This package contains the nodes that utilize the Move Group Interface C++ API to generate pose targets from a custom topic interface.
+This package contains the node that utilize the Move Group Interface C++ API to generate pose targets from a custom topic interface.
 
 
 ## Features

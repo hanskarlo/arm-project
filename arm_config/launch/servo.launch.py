@@ -66,7 +66,7 @@ def generate_launch_description():
     rviz_config = os.path.join(
         get_package_share_directory("arm_config"),
         "config", 
-        "moveit.rviz"
+        "servo.rviz"
     )
 
     rviz_node = Node(

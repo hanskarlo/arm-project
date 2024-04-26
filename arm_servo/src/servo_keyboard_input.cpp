@@ -1,43 +1,3 @@
-/*********************************************************************
- * Software License Agreement (BSD License)
- *
- *  Copyright (c) 2023, PickNik LLC
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
- *  are met:
- *
- *   * Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above
- *     copyright notice, this list of conditions and the following
- *     disclaimer in the documentation and/or other materials provided
- *     with the distribution.
- *   * Neither the name of PickNik LLC nor the names of its
- *     contributors may be used to endorse or promote products derived
- *     from this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- *  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- *  POSSIBILITY OF SUCH DAMAGE.
- *********************************************************************/
-
-/*      Title     : servo_keyboard_input.cpp
- *      Project   : moveit_servo
- *      Created   : 05/31/2021
- *      Author    : Adam Pettinger, V Mohammed Ibrahim
- */
-
 #include <chrono>
 #include <control_msgs/msg/joint_jog.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
@@ -70,6 +30,8 @@ constexpr int8_t KEYCODE_J = 0x6A;
 constexpr int8_t KEYCODE_T = 0x74;
 constexpr int8_t KEYCODE_W = 0x77;
 constexpr int8_t KEYCODE_E = 0x65;
+constexpr int8_t KEYCODE_I = 0x69;
+constexpr int8_t KEYCODE_O = 0x6F;
 }  // namespace
 
 // Some constants used in the Servo Teleop demo
@@ -133,13 +95,16 @@ private:
   rclcpp::Client<moveit_msgs::srv::ServoCommandType>::SharedPtr switch_input_;
 
   std::shared_ptr<moveit_msgs::srv::ServoCommandType::Request> request_;
-  double joint_vel_cmd_;
+  double joint_vel_cmd_;       // rad/s
+  double cartesian_step_size_; // meters
   std::string command_frame_id_;
 };
 
-KeyboardServo::KeyboardServo() : joint_vel_cmd_(1.0), command_frame_id_{ "base_link" }
+KeyboardServo::KeyboardServo() : joint_vel_cmd_(0.1), cartesian_step_size_(0.1), command_frame_id_{ "base_link" }
 {
   nh_ = rclcpp::Node::make_shared("servo_keyboard_input");
+
+  request_ = std::make_shared<moveit_msgs::srv::ServoCommandType::Request>();
 
   twist_pub_ = nh_->create_publisher<geometry_msgs::msg::TwistStamped>(TWIST_TOPIC, ROS_QUEUE_SIZE);
   joint_pub_ = nh_->create_publisher<control_msgs::msg::JointJog>(JOINT_TOPIC, ROS_QUEUE_SIZE);
@@ -196,6 +161,7 @@ int KeyboardServo::keyLoop()
   puts("Use 'j' to select joint jog. ");
   puts("Use 't' to select twist ");
   puts("Use 'w' and 'e' to switch between sending command in planning frame or end effector frame");
+  puts("Use 'i' to increase the speed, 'o' to decrease the speed");
   puts("'Q' to quit.");
 
   for (;;)
@@ -212,8 +178,9 @@ int KeyboardServo::keyLoop()
     }
 
     RCLCPP_DEBUG(nh_->get_logger(), "value: 0x%02X\n", c);
+    // RCLCPP_INFO(nh_->get_logger(), "value: 0x%02X\n", c);
 
-    // // Create the messages we might publish
+    // Create the messages we might publish
     auto twist_msg = std::make_unique<geometry_msgs::msg::TwistStamped>();
     auto joint_msg = std::make_unique<control_msgs::msg::JointJog>();
 
@@ -228,32 +195,32 @@ int KeyboardServo::keyLoop()
     {
       case KEYCODE_LEFT:
         RCLCPP_DEBUG(nh_->get_logger(), "LEFT");
-        twist_msg->twist.linear.y = -0.1;
+        twist_msg->twist.linear.y = -cartesian_step_size_;
         publish_twist = true;
         break;
       case KEYCODE_RIGHT:
         RCLCPP_DEBUG(nh_->get_logger(), "RIGHT");
-        twist_msg->twist.linear.y = 0.1;
+        twist_msg->twist.linear.y = cartesian_step_size_;
         publish_twist = true;
         break;
       case KEYCODE_UP:
         RCLCPP_DEBUG(nh_->get_logger(), "UP");
-        twist_msg->twist.linear.x = 0.1;
+        twist_msg->twist.linear.x = cartesian_step_size_;
         publish_twist = true;
         break;
       case KEYCODE_DOWN:
         RCLCPP_DEBUG(nh_->get_logger(), "DOWN");
-        twist_msg->twist.linear.x = -0.1;
+        twist_msg->twist.linear.x = -cartesian_step_size_;
         publish_twist = true;
         break;
       case KEYCODE_PERIOD:
         RCLCPP_DEBUG(nh_->get_logger(), "PERIOD");
-        twist_msg->twist.linear.z = -0.1;
+        twist_msg->twist.linear.z = -cartesian_step_size_;
         publish_twist = true;
         break;
       case KEYCODE_SEMICOLON:
         RCLCPP_DEBUG(nh_->get_logger(), "SEMICOLON");
-        twist_msg->twist.linear.z = 0.1;
+        twist_msg->twist.linear.z = cartesian_step_size_;
         publish_twist = true;
         break;
       case KEYCODE_1:
@@ -292,7 +259,6 @@ int KeyboardServo::keyLoop()
         break;
       case KEYCODE_J:
         RCLCPP_DEBUG(nh_->get_logger(), "j");
-        request_ = std::make_shared<moveit_msgs::srv::ServoCommandType::Request>();
         request_->command_type = moveit_msgs::srv::ServoCommandType::Request::JOINT_JOG;
         if (switch_input_->wait_for_service(std::chrono::seconds(1)))
         {
@@ -309,7 +275,6 @@ int KeyboardServo::keyLoop()
         break;
       case KEYCODE_T:
         RCLCPP_DEBUG(nh_->get_logger(), "t");
-        request_ = std::make_shared<moveit_msgs::srv::ServoCommandType::Request>();
         request_->command_type = moveit_msgs::srv::ServoCommandType::Request::TWIST;
         if (switch_input_->wait_for_service(std::chrono::seconds(1)))
         {
@@ -333,6 +298,38 @@ int KeyboardServo::keyLoop()
         RCLCPP_DEBUG(nh_->get_logger(), "e");
         RCLCPP_INFO_STREAM(nh_->get_logger(), "Command frame set to: " << EE_FRAME_ID);
         command_frame_id_ = EE_FRAME_ID;
+        break;
+      case KEYCODE_I:
+        if (request_->command_type == moveit_msgs::srv::ServoCommandType::Request::JOINT_JOG)
+        {
+          if (joint_vel_cmd_ > 0)
+            joint_vel_cmd_ += 0.1;
+          else
+            joint_vel_cmd_ -= 0.1;
+
+          RCLCPP_INFO_STREAM(nh_->get_logger(), "Joint velocity increased: " << joint_vel_cmd_ << "rad/s");
+        }
+        else if (request_->command_type == moveit_msgs::srv::ServoCommandType::Request::TWIST)
+        {
+          cartesian_step_size_ += 0.01; //cm
+          RCLCPP_INFO_STREAM(nh_->get_logger(), "Cartesian step size increased: " << cartesian_step_size_ << "m");
+        }
+        break;
+      case KEYCODE_O:
+        if (request_->command_type == moveit_msgs::srv::ServoCommandType::Request::JOINT_JOG)
+        {
+          if (joint_vel_cmd_ > 0)
+            joint_vel_cmd_ -= 0.1;
+          else
+            joint_vel_cmd_ += 0.1;
+
+          RCLCPP_INFO_STREAM(nh_->get_logger(), "Joint velocity decreased: " << joint_vel_cmd_ << "rad/s");
+        }
+        else if (request_->command_type == moveit_msgs::srv::ServoCommandType::Request::TWIST)
+        {
+          cartesian_step_size_ -= 0.01; //cm
+          RCLCPP_INFO_STREAM(nh_->get_logger(), "Cartesian step size decreased: " << cartesian_step_size_ << "m");
+        }
         break;
       case KEYCODE_Q:
         RCLCPP_DEBUG(nh_->get_logger(), "quit");

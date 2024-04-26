@@ -10,31 +10,31 @@ default_acceleration_scaling_factor: 0.1
 joint_limits:
   j1:
     has_velocity_limits: true
-    max_velocity: 1.75
+    max_velocity: 2.617   # rad/s, 150 deg/s, 25rpm
     has_acceleration_limits: true
     max_acceleration: 20.94
   j2:
     has_velocity_limits: true
-    max_velocity: 1.75
+    max_velocity: 2.617   # rad/s, 150 deg/s, 25rpm
     has_acceleration_limits: true
     max_acceleration: 20.94
   j3:
     has_velocity_limits: true
-    max_velocity: 1.75
+    max_velocity: 2.617   # rad/s, 150 deg/s, 25rpm
     has_acceleration_limits: true
     max_acceleration: 20.94
   j4:
     has_velocity_limits: true
-    max_velocity: 1.570796327
+    max_velocity: 3.1415  # rad/s, 180 deg/s, 30rpm
     has_acceleration_limits: true
     max_acceleration: 20.94
   j5:
     has_velocity_limits: true
-    max_velocity: 1.570796327
+    max_velocity: 3.1415  # rad/s, 180 deg/s, 30rpm
     has_acceleration_limits: true
     max_acceleration: 20.94
   j6:
     has_velocity_limits: true
-    max_velocity: 1.570796327
+    max_velocity: 3.1415  # rad/s, 180 deg/s, 30rpm
     has_acceleration_limits: true
     max_acceleration: 20.94
