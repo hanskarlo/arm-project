@@ -2,3 +2,4 @@
 *.pose.json
 *.trajectory
 *.scene
+arm_tests/arm_tests/__pycache__

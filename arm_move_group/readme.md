@@ -14,7 +14,9 @@
 
 ## Description
 
-This package contains the node that utilize the Move Group Interface C++ API to generate pose targets from a custom topic interface.
+This package hosts the node that utilizes the Move Group C++ Interface to generate motion plans from a custom service interface.
+
+The custom service interface is outlined in the **arm_msgs** package. Example service calls can be found in the **arm_tests** package.
 
 
 ## Features
@@ -103,7 +105,7 @@ The following command generates a curved motion plan creating a quarter-circle a
 <br>
 
 ```bash
-ros2 topic pub --once /arm/PoseGoalArray arm_msgs/msg/PoseTargetArray '{type: 'linear', step_size: 0.01, jump_threshold: 0.0, waypoints: {pose: {position: {x: 0.01, y: 0.0, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}, pose: {position: {x: 0.01, y: 0.0, z: 0.01}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}}'
+ros2 service call /arm/PoseGoalArray arm_msgs/srv/PoseTargetArray '{type: 'linear', step_size: 0.01, jump_threshold: 0.0, waypoints: {pose: {position: {x: 0.01, y: 0.0, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}, pose: {position: {x: 0.01, y: 0.0, z: 0.01}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}}'
 ```
 
 <br>
@@ -136,6 +138,6 @@ ros2 topic pub --once /arm/Clear std_msgs/msg/Bool '{data: True}'
 
 ## Notes
 ### Motion Planners
-The aroarm move group interface node utilizes the STOMP planner for linear movements in space, and uses the PILZ ('CIRC') industrial motion planner for circular/arc movements.
+The arm move group interface node utilizes the STOMP planner for linear movements in space, and uses the PILZ ('CIRC') industrial motion planner for circular/arc movements.
 
 > :warning: STOMP planner only accepts **joint space** goals.

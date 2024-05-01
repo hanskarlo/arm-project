@@ -14,7 +14,7 @@ setup(
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='aroarm0',
-    maintainer_email='hjarales@arosystems.ai',
+    maintainer_email='hansjarales@gmail.com',
     description='TODO: Package description',
     license='TODO: License declaration',
     tests_require=['pytest'],

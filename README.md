@@ -12,6 +12,7 @@ The software was tested on an ASUS PN50 with
 ## Built with
 
 [<img src="https://images.squarespace-cdn.com/content/v1/606d378755a86f589aa297b7/1653397531343-6M4IQ4JWDQV1SQ8W17UN/HumbleHawksbill_TransparentBG-NoROS.png" alt="MoveIt Logo" width="200"/>](https://docs.ros.org/en/humble/index.html)
+[<img src="https://automaticaddison.com/wp-content/uploads/2023/10/ros2-iron.png" alt="MoveIt Logo" width="240"/>](https://docs.ros.org/en/iron/Releases/Release-Iron-Irwini.html)
 
 [<img src="https://moveit.ros.org/assets/logo/moveit_logo-black.png" alt="MoveIt Logo" width="200"/>](https://github.com/ros-planning/moveit2)
 
@@ -24,29 +25,79 @@ The software was tested on an ASUS PN50 with
 * Linux Kernel with Real-time patch (**Optional**)
 * Ethernet hardware
 * Ubuntu 22.04 (Jammy Jellyfish)
-* ROS2 Humble
-* MoveIt2
+* ROS2 Humble Hawksbill or ROS2 Iron Irwini
+* MoveIt2 Humble or MoveIt2 Iron
 * IgH EtherCAT Master for Linux
 
 ### Installation
 Clone the repository **into your MoveIt2 workspace /src folder** 
-```
+```bash
 cd /your_moveit2_ws/src
 git clone https:/github.com/hanskarlo/arm-project.git
 ```
 
+<br>
+
+#### Build order
+
 Source your workspace and build the packages
-```
+```bash
 cd /your_moveit2_ws
 source install/setup.bash
-colcon build
 ```
+
+<br>
+
+Build the robot description package containing the URDF file and associated meshes
+
+```bash
+colcon build --packages-select arm_description
+```
+
+
+<br>
+
+Build the arm config package produced by the MoveIt2 setup assistant
+
+```bash
+colcon build --packages-select arm_config
+```
+
+
+<br>
+
+Build the EtherCAT interface package and custom ros2_control hardware package
+```bash
+colcon build --packages-select arm_ethercat_interface arm_hardware 
+```
+
+<br>
+
+Build the arm_msgs package containing the custom service interfaces
+```bash
+colcon build --packages-select arm_msgs
+```
+
+<br>
+
+Build the rest of the packages:
+- arm_move_group: Contains node that answers service calls to interface with the arm using the Move Group C++ API
+- arm_servo: Utilizes keyboard input to servo arm utilizing MoveIt Servo
+- arm_tests: Contains tests and example service calls in python
+
+```bash
+colcon build --packages-select arm_move_group arm_servo arm_tests
+```
+
+<br>
 
 ## Usage
 Start the EtherCAT Master module:
-```
+```bash
 sudo /etc/init.d/ethercat start
 ```
+
+<br>
 
 Run the arm_ethercat_interface node:
 ```bash
@@ -62,9 +113,11 @@ Once all actuators have reached the **Operation enabled** state (CiA402 FSA), la
 ros2 launch arm_config hardware.launch.py
 ```
 
+<br>
+
 ## ToDo
-- Support for ROS2 Iron, and consequently, newer MoveIt2 versions/features.
 - Explore different EtherCAT syncing techniques with the eRob actuators (i.e. DC Synchronization).
+  - Consider placing EtherCAT interface software directly in ros2_control hardware interface
 
 
 ## Known issues
