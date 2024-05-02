@@ -47,6 +47,9 @@ def generate_launch_description():
         output="screen",
         parameters=[moveit_config.to_dict()],
         arguments=["--ros-args", "--log-level", "info"],
+        remappings=[
+            ('/robot_description', '/arm/robot_description')
+        ]
     )
 
     # RViz
@@ -75,14 +78,17 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="static_transform_publisher",
         output="log",
-        arguments=["0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "world", "base_link"],
+        arguments=["1.0", "1.0", "1.0", "0.0", "0.0", "0.0", "base_link", "arm_link"],
     )
 
     # Publish TF
     robot_state_publisher = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
-        name="robot_state_publisher",
+        remappings=[
+            ('/robot_description', '/arm/robot_description')
+        ],
+        name="arm_state_publisher",
         output="both",
         parameters=[moveit_config.robot_description],
     )
@@ -98,7 +104,7 @@ def generate_launch_description():
         executable="ros2_control_node",
         parameters=[ros2_controllers_path],
         remappings=[
-            ("/controller_manager/robot_description", "/robot_description"),
+            ("/controller_manager/robot_description", '/arm/robot_description'),
         ],
         output="screen",
     )

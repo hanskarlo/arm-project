@@ -1,6 +1,6 @@
 ## MoveIt properties
 move_group_name:  arm_group
-planning_frame: base_link
+planning_frame: arm_link
 robot_link_command_frame: base_link
 
 command_out_topic: /arm_group_controller/joint_trajectory

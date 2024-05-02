@@ -5,6 +5,6 @@ moveit_setup_assistant_config:
   srdf:
     relative_path: config/zeroerr_arm.srdf
   package_settings:
-    author_name: aro
-    author_email: software@arosystems.ai
+    author_name: hanskarlo
+    author_email: hansjarales@gmail.com
     generated_timestamp: 1710373077
