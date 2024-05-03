@@ -10,6 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(realtime_tools REQUIRED)
 
 # EtherLab
 set(ETHERLAB_DIR /usr/local)
@@ -36,6 +37,7 @@ ament_target_dependencies(
   ${PROJECT_NAME}
   rclcpp
   sensor_msgs
+  realtime_tools
 )
 
 # INSTALL

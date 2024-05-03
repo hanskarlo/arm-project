@@ -30,6 +30,9 @@ class ZeroErrInterface : public rclcpp::Node
         ZeroErrInterface();
         ~ZeroErrInterface();
 
+        rclcpp::CallbackGroup::SharedPtr get_high_prio_callback_group();
+        rclcpp::CallbackGroup::SharedPtr get_normal_prio_callback_group();
+
 
     private:
         const std::string LOGGER = "zeroerr_interface";
@@ -72,6 +75,9 @@ class ZeroErrInterface : public rclcpp::Node
 
         rclcpp::TimerBase::SharedPtr cyclic_pdo_timer_;
         rclcpp::TimerBase::SharedPtr joint_state_pub_timer_;
+
+        rclcpp::CallbackGroup::SharedPtr high_prio_cbg_;
+        rclcpp::CallbackGroup::SharedPtr normal_prio_cbg_;
         
 
         bool configure_pdos_();

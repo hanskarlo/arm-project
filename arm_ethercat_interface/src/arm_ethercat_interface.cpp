@@ -1,10 +1,16 @@
-
 #include "arm_ethercat_interface/arm_ethercat_interface.h"
+#include "realtime_tools/thread_priority.hpp"
 
 
 ZeroErrInterface::ZeroErrInterface() : Node("arm_ethercat_interface")
 {
     CYCLIC_DATA_PERIOD = std::chrono::milliseconds( MSEC_PER_SEC / FREQUENCY );
+
+
+    normal_prio_cbg_ = this->create_callback_group(
+        rclcpp::CallbackGroupType::MutuallyExclusive
+    );
+
 
     // Initialize vector variables (avoid segfault)
     joint_states_.name.resize(NUM_JOINTS);
@@ -21,10 +27,15 @@ ZeroErrInterface::ZeroErrInterface() : Node("arm_ethercat_interface")
 
     arm_state_pub_ = this->create_publisher<sensor_msgs::msg::JointState>("arm/state", 10);
 
+    rclcpp::SubscriptionOptionsWithAllocator<std::allocator<void>> options;
+    options.callback_group = normal_prio_cbg_;
+
     arm_cmd_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
         "arm/command",
         10,
-        std::bind(&ZeroErrInterface::arm_cmd_cb_, this, std::placeholders::_1));
+        std::bind(&ZeroErrInterface::arm_cmd_cb_, this, std::placeholders::_1),
+        options);
+
 
     if (!init_())
     {
@@ -35,15 +46,18 @@ ZeroErrInterface::ZeroErrInterface() : Node("arm_ethercat_interface")
 
     stamp_ = this->now().seconds();
 
+
     // Create cyclic data exchange timer
     cyclic_pdo_timer_ = this->create_wall_timer(
         CYCLIC_DATA_PERIOD,
-        std::bind(&ZeroErrInterface::cyclic_pdo_loop_, this));
+        std::bind(&ZeroErrInterface::cyclic_pdo_loop_, this),
+        high_prio_cbg_);
         
     // Create joint state publisher timer
     joint_state_pub_timer_ = this->create_wall_timer(
         JOINT_STATE_PERIOD,
-        std::bind(&ZeroErrInterface::joint_state_pub_, this));
+        std::bind(&ZeroErrInterface::joint_state_pub_, this),
+        normal_prio_cbg_);
     
     clock_gettime(CLOCK_TO_USE, &wakeupTime);
 }
@@ -1025,22 +1039,63 @@ void ZeroErrInterface::arm_cmd_cb_(sensor_msgs::msg::JointState::UniquePtr arm_c
     }
 }
 
+rclcpp::CallbackGroup::SharedPtr ZeroErrInterface::get_high_prio_callback_group()
+{
+    high_prio_cbg_ = get_node_base_interface()->get_default_callback_group();
+    return high_prio_cbg_;  // the default callback group.
+}
+
+rclcpp::CallbackGroup::SharedPtr ZeroErrInterface::get_normal_prio_callback_group()
+{
+    return normal_prio_cbg_;
+}
+
 
 int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
 
+    rclcpp::executors::SingleThreadedExecutor high_prio_exec_;
+    rclcpp::executors::SingleThreadedExecutor normal_prio_exec_;
+
     auto node = std::make_shared<ZeroErrInterface>();
 
-    //* Set priority
-    struct sched_param param = {};
-    param.sched_priority = sched_get_priority_max(SCHED_FIFO);
-    RCLCPP_INFO(node->get_logger(), "Using priority %i.\n", param.sched_priority);
-    if (sched_setscheduler(0, SCHED_FIFO, &param) == -1) {
-        RCLCPP_ERROR(node->get_logger(), "sched_setscheduler failed\n");
-    }
+    high_prio_exec_.add_callback_group(
+        node->get_high_prio_callback_group(), node->get_node_base_interface()
+    );
 
-    rclcpp::spin(node);
+    normal_prio_exec_.add_callback_group(
+        node->get_normal_prio_callback_group(), node->get_node_base_interface()
+    );
+
+    // Create a thread for each of the two executors ...
+    auto high_prio_thread = std::thread(
+        [&]() {
+
+            //* Set thread priority
+            if (!realtime_tools::configure_sched_fifo(sched_get_priority_max(SCHED_FIFO)))
+                RCLCPP_WARN(node->get_logger(), "Couldnt enable FIFO RT Scheduling!");
+            
+            high_prio_exec_.spin();
+            
+        });
+
+    auto low_prio_thread = std::thread(
+        [&]() {
+            normal_prio_exec_.spin();
+        });
+
+    //* Set main thread priority
+    // struct sched_param param = {};
+    // param.sched_priority = sched_get_priority_max(SCHED_FIFO);
+    // RCLCPP_INFO(node->get_logger(), "Using priority %i.\n", param.sched_priority);
+    // if (sched_setscheduler(0, SCHED_FIFO, &param) == -1) {
+    //     RCLCPP_ERROR(node->get_logger(), "sched_setscheduler failed\n");
+    // }
+
+    // rclcpp::spin(node);
+
+    while (rclcpp::ok());
 
     rclcpp::shutdown();
 

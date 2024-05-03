@@ -19,7 +19,7 @@ def generate_launch_description():
     """
     ros2_control_hardware_type = DeclareLaunchArgument(
         "ros2_control_hardware_type",
-        default_value="mock_components",
+        default_value="real",
         description="ROS 2 control hardware interface type to use for the launch file -- possible values: [mock_components, real]",
     )
 
@@ -89,7 +89,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="static_transform_publisher",
         output="log",
-        arguments=["0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "world", "base_link"],
+        arguments=["0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "world", "arm_link"],
     )
 
     # Publish TF
