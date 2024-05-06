@@ -30,6 +30,8 @@
 #include "arm_msgs/srv/save.hpp"
 #include "arm_msgs/srv/move_to_saved.hpp"
 
+#include "arm_msgs/srv/get_state.hpp"
+
 
 
 
@@ -76,6 +78,7 @@ class ArmMoveGroup
         using Trigger = std_srvs::srv::Trigger;
         using Save = arm_msgs::srv::Save;
         using MoveToSaved = arm_msgs::srv::MoveToSaved;
+        using GetState = arm_msgs::srv::GetState;
 
         rclcpp::Service<Trigger>::SharedPtr execute_srv_;
         rclcpp::Service<Trigger>::SharedPtr stop_srv_;
@@ -87,6 +90,8 @@ class ArmMoveGroup
         rclcpp::Service<Save>::SharedPtr save_srv_;
         rclcpp::Service<MoveToSaved>::SharedPtr move_to_saved_srv_;  
 
+        rclcpp::Service<GetState>::SharedPtr get_state_srv_;
+
 
         // Service callbacks
         void save_cb_(const std::shared_ptr<Save::Request> request, std::shared_ptr<Save::Response> response);
@@ -96,6 +101,7 @@ class ArmMoveGroup
         void joint_space_goal_cb_(const std::shared_ptr<JointSpaceGoal::Request> request, std::shared_ptr<JointSpaceGoal::Response> response);
         void pose_goal_cb_(const std::shared_ptr<PoseGoal::Request> request, std::shared_ptr<PoseGoal::Response> response);
         void pose_goal_array_cb_(const std::shared_ptr<PoseGoalArray::Request> request, std::shared_ptr<PoseGoalArray::Response> response);
+        void get_state_cb_(const std::shared_ptr<GetState::Request> request, std::shared_ptr<GetState::Response> response);
 
 
         moveit::planning_interface::MoveGroupInterface::Plan plan_;

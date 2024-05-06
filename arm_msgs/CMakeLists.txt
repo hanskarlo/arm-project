@@ -13,6 +13,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(shape_msgs REQUIRED)
 
 set(msg_files
+  "srv/GetState.srv"
   "srv/JointSpaceGoal.srv"
   "srv/MoveToSaved.srv"
   "srv/PoseGoal.srv"

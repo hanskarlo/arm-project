@@ -56,6 +56,11 @@ ArmMoveGroup::ArmMoveGroup()
 		std::bind(&ArmMoveGroup::execute_saved_cb_, this, _1, _2)
 	);
 
+	get_state_srv_ = node_->create_service<GetState>(
+		"arm/GetState",
+		std::bind(&ArmMoveGroup::get_state_cb_, this, _1, _2)
+	);
+
 
 	RCLCPP_INFO(node_->get_logger(), "Initialized!");
 }
@@ -425,7 +430,7 @@ void ArmMoveGroup::stop_cb_(
 		response->message = e.what();
 		response->success = false;
 	}
-	
+
 	
 }
 
@@ -435,13 +440,12 @@ void ArmMoveGroup::clear_cb_(const std_msgs::msg::Bool::SharedPtr clear_msg)
 	if (clear_msg->data)
 	{
 		auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+		move_group.startStateMonitor(5.0);
 
 		if (joint_space_goal_recv_)
 		{
 			RCLCPP_INFO(node_->get_logger(), "Clearing joint space target");
 
-			// move_group.getCurrentState(10.0);
-			move_group.startStateMonitor(5.0);
 
 			std::vector<double> joint_group_positions;
 			joint_group_positions = move_group.getCurrentJointValues();
@@ -764,6 +768,40 @@ void ArmMoveGroup::execute_saved_cb_(
 		response->executed = false;
 	}
 
+}
+
+
+void ArmMoveGroup::get_state_cb_(const std::shared_ptr<GetState::Request> request, std::shared_ptr<GetState::Response> response)
+{
+	// Suppress compiler warning
+	(void) request;
+
+	RCLCPP_INFO(node_->get_logger(), "Received GetState service call.");
+
+	// Start move group interface
+	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+	move_group.startStateMonitor(2.0);
+
+	RCLCPP_INFO(node_->get_logger(), "Getting end effector (%s) state.", move_group.getEndEffectorLink().c_str());
+
+	// Get end effector coordinates in arm_Link frame
+	response->coordinates.x = move_group.getCurrentPose().pose.position.x;
+	response->coordinates.y = move_group.getCurrentPose().pose.position.y;
+	response->coordinates.z = move_group.getCurrentPose().pose.position.z;
+
+	// RCLCPP_INFO(node_->get_logger(), "x: %f", response->coordinates.x);
+	// RCLCPP_INFO(node_->get_logger(), "y: %f", response->coordinates.y);
+	// RCLCPP_INFO(node_->get_logger(), "z: %f", response->coordinates.z);
+
+	
+	// Get joint positions, converted to degrees
+	for (uint i = 0; i < NUM_JOINTS; i++)
+	{
+		int16_t deg = (int16_t) (move_group.getCurrentJointValues()[i] * 180.0) / PI;
+		response->joint_pos_deg[i] = deg;
+
+		// RCLCPP_INFO(node_->get_logger(), "J%d: %d degrees", i, deg);
+	}
 }
 
 

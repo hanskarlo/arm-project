@@ -4,12 +4,12 @@
   <name>arm_tests</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="hjarales@arosystems.ai">arm</maintainer>
+  <maintainer email="hansjarales@gmail.com">arm</maintainer>
   <license>TODO: License declaration</license>
 
   <exec_depend>rclpy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
-  <exec_depend>zeroerr_msgs</exec_depend>
+  <exec_depend>arm_msgs</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>trajectory_msgs</exec_depend>
 
