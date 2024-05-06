@@ -78,7 +78,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="static_transform_publisher",
         output="log",
-        arguments=["1.0", "1.0", "1.0", "0.0", "0.0", "0.0", "base_link", "arm_link"],
+        arguments=["1.0", "1.0", "1.0", "0.0", "0.0", "0.0", "base_link", "arm_Link"],
     )
 
     # Publish TF
@@ -123,7 +123,6 @@ def generate_launch_description():
         package="controller_manager",
         executable="spawner",
         arguments=["arm_group_controller", "-c", "/controller_manager"],
-        # prefix=["sudo -E"]
     )
 
     return LaunchDescription(

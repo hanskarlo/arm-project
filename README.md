@@ -14,7 +14,7 @@ The software was tested on an ASUS PN50 with
 [<img src="https://images.squarespace-cdn.com/content/v1/606d378755a86f589aa297b7/1653397531343-6M4IQ4JWDQV1SQ8W17UN/HumbleHawksbill_TransparentBG-NoROS.png" alt="MoveIt Logo" width="200"/>](https://docs.ros.org/en/humble/index.html)
 [<img src="https://automaticaddison.com/wp-content/uploads/2023/10/ros2-iron.png" alt="MoveIt Logo" width="240"/>](https://docs.ros.org/en/iron/Releases/Release-Iron-Irwini.html)
 
-[<img src="https://moveit.ros.org/assets/logo/moveit_logo-black.png" alt="MoveIt Logo" width="200"/>](https://github.com/ros-planning/moveit2)
+[<img src="https://moveit.picknik.ai/main/_static/rolling-small.png" alt="MoveIt Logo" width="200"/>](https://github.com/ros-planning/moveit2)
 
 [![EtherCat](https://gitlab.com/uploads/-/system/project/avatar/24894054/master-128.png?width=200)](https://gitlab.com/etherlab.org/ethercat)
 

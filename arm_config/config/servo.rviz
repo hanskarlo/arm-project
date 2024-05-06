@@ -69,7 +69,7 @@ Visualization Manager:
           Expand Link Details: false
           Expand Tree: false
           Link Tree Style: Links in Alphabetic Order
-          arm_link:
+          arm_Link:
             Alpha: 1
             Show Axes: false
             Show Trail: false
@@ -150,7 +150,7 @@ Visualization Manager:
           Expand Link Details: false
           Expand Tree: false
           Link Tree Style: Links in Alphabetic Order
-          arm_link:
+          arm_Link:
             Alpha: 1
             Show Axes: true
             Show Trail: false
@@ -193,7 +193,7 @@ Visualization Manager:
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: arm_link
+    Fixed Frame: arm_Link
     Frame Rate: 30
   Name: root
   Tools:
@@ -224,7 +224,7 @@ Visualization Manager:
       Name: Current View
       Near Clip Distance: 0.009999999776482582
       Pitch: 0.6850003600120544
-      Target Frame: arm_link
+      Target Frame: arm_Link
       Value: Orbit (rviz_default_plugins)
       Yaw: 2.327005624771118
     Saved: ~

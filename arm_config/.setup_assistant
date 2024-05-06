@@ -1,6 +1,6 @@
 moveit_setup_assistant_config:
   urdf:
-    package: zeroerr_description
+    package: arm_description
     relative_path: urdf/zeroerr.urdf
   srdf:
     relative_path: config/zeroerr_arm.srdf
