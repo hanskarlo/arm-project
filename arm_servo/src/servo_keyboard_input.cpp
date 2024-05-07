@@ -135,7 +135,7 @@ private:
   std::string command_frame_id_;
 };
 
-KeyboardServo::KeyboardServo() : joint_vel_cmd_(0.1), cartesian_step_size_(0.1), command_frame_id_{ "base_link" }
+KeyboardServo::KeyboardServo() : joint_vel_cmd_(0.1), cartesian_step_size_(0.1), command_frame_id_{ "arm_Link" }
 {
   nh_ = rclcpp::Node::make_shared("servo_keyboard_input");
 

@@ -62,7 +62,7 @@ ZeroErrInterface::ZeroErrInterface() : Node("arm_ethercat_interface")
         std::bind(&ZeroErrInterface::joint_state_pub_, this),
         normal_prio_cbg_);
     
-    // clock_gettime(CLOCK_TO_USE, &wakeupTime);
+    clock_gettime(CLOCK_TO_USE, &wakeupTime);
 }
 
 
@@ -540,12 +540,12 @@ bool ZeroErrInterface::set_drive_parameters_()
 
 
         // Setup DC-Synchronization 
-        // ecrt_slave_config_dc(
-        //     joint_slave_configs[i], 
-        //     ASSIGN_ACTIVATE, 
-        //     SYNC0_CYCLE, 
-        //     SYNC0_SHIFT, 
-        //     0, 0);
+        ecrt_slave_config_dc(
+            joint_slave_configs[i], 
+            ASSIGN_ACTIVATE, 
+            PERIOD_NS*2, 
+            SYNC0_SHIFT, 
+            0, 0);
     
     }
 
@@ -727,8 +727,8 @@ struct timespec timespec_add(struct timespec time1, struct timespec time2)
  */
 void ZeroErrInterface::cyclic_pdo_loop_()
 {
-    // ecrt_master_application_time(master, TIMESPEC2NS(wakeupTime));
-    // wakeupTime = timespec_add(wakeupTime, cycletime);
+    ecrt_master_application_time(master, TIMESPEC2NS(wakeupTime));
+    wakeupTime = timespec_add(wakeupTime, cycletime);
     // clock_nanosleep(CLOCK_TO_USE, TIMER_ABSTIME, &wakeupTime, NULL);
 
     // loop_start_time_ = (unsigned long) this->now().nanoseconds();
@@ -860,9 +860,9 @@ void ZeroErrInterface::cyclic_pdo_loop_()
         //         target_pos += delta;
         //     else if (current_pos > 0)
         //         target_pos -= delta;
-                 
         //     EC_WRITE_S32(domain_pd + target_pos_offset[joint_index], target_pos);
         // }
+
 
         //* Uncomment to jog J6 between [-180, 180]
         // int32_t current_pos = EC_READ_S32(domain_pd + actual_pos_offset[5]);
@@ -904,18 +904,18 @@ void ZeroErrInterface::cyclic_pdo_loop_()
     // ecrt_master_application_time(master, TIMESPEC2NS(t));
     // ecrt_master_application_time(master, TIMESPEC2NS(wakeupTime));
 
-    // if (sync_ref_counter)
-    // {
-        // sync_ref_counter--;
-    // }
-    // else
-    // {
-        // sync_ref_counter = 1;
-        // clock_gettime(CLOCK_REALTIME, &time_ns);
-        // ecrt_master_sync_reference_clock_to(master, TIMESPEC2NS(time_ns));
-    // }
+    if (sync_ref_counter)
+    {
+        sync_ref_counter--;
+    }
+    else
+    {
+        sync_ref_counter = 1;
+        clock_gettime(CLOCK_REALTIME, &time_ns);
+        ecrt_master_sync_reference_clock_to(master, TIMESPEC2NS(time_ns));
+    }
     // ecrt_master_sync_reference_clock(master);
-    // ecrt_master_sync_slave_clocks(master);
+    ecrt_master_sync_slave_clocks(master);
 
     // send process data
     ecrt_domain_queue(domain);

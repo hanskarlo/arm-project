@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="zeroerr_arm">
+    <xacro:arg name="ros2_control_hardware_type" default="mock_components" />
+
+    <!-- Import zeroerr_arm urdf file -->
+    <xacro:include filename="$(find arm_description)/urdf/zeroerr_cts.urdf" />
+
+    <!-- Import control_xacro -->
+    <xacro:include filename="zeroerr_arm.ros2_control.xacro" />
+
+    <xacro:arm_ros2_control name="ArmProjectCts" ros2_control_hardware_type="$(arg ros2_control_hardware_type)"/>
+
+</robot>

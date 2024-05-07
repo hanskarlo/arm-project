@@ -19,14 +19,14 @@ def generate_launch_description():
     """
     ros2_control_hardware_type = DeclareLaunchArgument(
         "ros2_control_hardware_type",
-        default_value="real",
+        default_value="mock_components",
         description="ROS 2 control hardware interface type to use for the launch file -- possible values: [mock_components, real]",
     )
 
     moveit_config = (
-        MoveItConfigsBuilder("zeroerr_arm", package_name="arm_config")
+        MoveItConfigsBuilder("ArmProjectCts", package_name="arm_config")
         .robot_description(
-            file_path="config/zeroerr_arm.urdf.xacro",
+            file_path="config/zeroerr_arm_servo.urdf.xacro",
             mappings={"ros2_control_hardware_type": LaunchConfiguration("ros2_control_hardware_type")},
         )
         .robot_description_semantic(file_path="config/zeroerr_arm.srdf")
@@ -35,6 +35,7 @@ def generate_launch_description():
             publish_robot_description=True, 
             publish_robot_description_semantic=True
         )
+        .joint_limits(file_path="config/servo_joint_limits.yaml")
         .trajectory_execution(file_path="config/moveit_controllers.yaml")
         .planning_pipelines(
             pipelines=[
@@ -57,8 +58,8 @@ def generate_launch_description():
     )
 
     arm_interface = Node(
-        package="zeroerr_interface",
-        executable="zeroerr_interface",
+        package="arm_ethercat_interface",
+        executable="arm_ethercat_interface",
         output="screen",
     )
 
@@ -89,7 +90,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="static_transform_publisher",
         output="log",
-        arguments=["0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "world", "arm_link"],
+        arguments=["0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "world", "arm_Link"],
     )
 
     # Publish TF
@@ -101,7 +102,6 @@ def generate_launch_description():
         parameters=[moveit_config.robot_description],
     )
 
-    # ros2_control using FakeSystem as hardware
     ros2_controllers_path = os.path.join(
         get_package_share_directory("arm_config"),
         "config",
