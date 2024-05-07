@@ -75,7 +75,7 @@ namespace
 const std::string TWIST_TOPIC = "/servo_node/delta_twist_cmds";
 const std::string JOINT_TOPIC = "/servo_node/delta_joint_cmds";
 const size_t ROS_QUEUE_SIZE = 10;
-const std::string PLANNING_FRAME_ID = "base_link";
+const std::string PLANNING_FRAME_ID = "arm_Link";
 const std::string EE_FRAME_ID = "j6_Link";
 }  // namespace
 

@@ -4,8 +4,6 @@
 
 ZeroErrInterface::ZeroErrInterface() : Node("arm_ethercat_interface")
 {
-    CYCLIC_DATA_PERIOD = std::chrono::milliseconds( MSEC_PER_SEC / FREQUENCY );
-
 
     normal_prio_cbg_ = this->create_callback_group(
         rclcpp::CallbackGroupType::MutuallyExclusive
@@ -48,6 +46,11 @@ ZeroErrInterface::ZeroErrInterface() : Node("arm_ethercat_interface")
 
 
     // Create cyclic data exchange timer
+
+    CYCLIC_DATA_PERIOD = std::chrono::milliseconds( MSEC_PER_SEC / FREQUENCY );
+    RCLCPP_INFO(this->get_logger(), "Cyclic data exchange running at %dms", (MSEC_PER_SEC / FREQUENCY));
+
+
     cyclic_pdo_timer_ = this->create_wall_timer(
         CYCLIC_DATA_PERIOD,
         std::bind(&ZeroErrInterface::cyclic_pdo_loop_, this),
@@ -59,7 +62,7 @@ ZeroErrInterface::ZeroErrInterface() : Node("arm_ethercat_interface")
         std::bind(&ZeroErrInterface::joint_state_pub_, this),
         normal_prio_cbg_);
     
-    clock_gettime(CLOCK_TO_USE, &wakeupTime);
+    // clock_gettime(CLOCK_TO_USE, &wakeupTime);
 }
 
 
@@ -537,12 +540,12 @@ bool ZeroErrInterface::set_drive_parameters_()
 
 
         // Setup DC-Synchronization 
-        ecrt_slave_config_dc(
-            joint_slave_configs[i], 
-            ASSIGN_ACTIVATE, 
-            SYNC0_CYCLE, 
-            SYNC0_SHIFT, 
-            0, 0);
+        // ecrt_slave_config_dc(
+        //     joint_slave_configs[i], 
+        //     ASSIGN_ACTIVATE, 
+        //     SYNC0_CYCLE, 
+        //     SYNC0_SHIFT, 
+        //     0, 0);
     
     }
 
@@ -724,8 +727,8 @@ struct timespec timespec_add(struct timespec time1, struct timespec time2)
  */
 void ZeroErrInterface::cyclic_pdo_loop_()
 {
-    ecrt_master_application_time(master, TIMESPEC2NS(wakeupTime));
-    wakeupTime = timespec_add(wakeupTime, cycletime);
+    // ecrt_master_application_time(master, TIMESPEC2NS(wakeupTime));
+    // wakeupTime = timespec_add(wakeupTime, cycletime);
     // clock_nanosleep(CLOCK_TO_USE, TIMER_ABSTIME, &wakeupTime, NULL);
 
     // loop_start_time_ = (unsigned long) this->now().nanoseconds();
@@ -846,44 +849,44 @@ void ZeroErrInterface::cyclic_pdo_loop_()
         }   
 
 
-    //     //* Uncomment to zero actuator
-    //     // uint joint_index = 3; // Change index to choose which joint to zero
-    //     // int32_t current_pos = EC_READ_S32(domain_pd + actual_pos_offset[joint_index]);
-    //     // int32_t target_pos = current_pos;
-    //     // uint32_t delta = 250;
-    //     // if (abs(current_pos) > delta)
-    //     // {
-    //     //     if (current_pos < 0)
-    //     //         target_pos += delta;
-    //     //     else if (current_pos > 0)
-    //     //         target_pos -= delta;
-    //     //          
-    //     //     EC_WRITE_S32(domain_pd + target_pos_offset[joint_index], target_pos);
-    //     // }
+        //* Uncomment to zero actuator
+        // uint joint_index = 4; // Change index to choose which joint to zero
+        // int32_t current_pos = EC_READ_S32(domain_pd + actual_pos_offset[joint_index]);
+        // int32_t target_pos = current_pos;
+        // uint32_t delta = 250;
+        // if (abs(current_pos) > delta)
+        // {
+        //     if (current_pos < 0)
+        //         target_pos += delta;
+        //     else if (current_pos > 0)
+        //         target_pos -= delta;
+                 
+        //     EC_WRITE_S32(domain_pd + target_pos_offset[joint_index], target_pos);
+        // }
 
-    //     //* Uncomment to jog J6 between [-180, 180]
-    //     // int32_t current_pos = EC_READ_S32(domain_pd + actual_pos_offset[5]);
-    //     // int32_t target_pos = current_pos;
-    //     // if (!toggle)
-    //     // {
-    //     //     if (current_pos < 262144)
-    //     //     {
-    //     //         target_pos += 8000;
-    //     //         EC_WRITE_S32(domain_pd + target_pos_offset[5], target_pos);
-    //     //     }
-    //     //     else
-    //     //         toggle = true;
-    //     // }
-    //     // else
-    //     // {
-    //     //     if (current_pos > -262144)
-    //     //     {
-    //     //         target_pos -= 8000;
-    //     //         EC_WRITE_S32(domain_pd + target_pos_offset[5], target_pos);
-    //     //     }
-    //     //     else
-    //     //         toggle = false;
-    //     // }
+        //* Uncomment to jog J6 between [-180, 180]
+        // int32_t current_pos = EC_READ_S32(domain_pd + actual_pos_offset[5]);
+        // int32_t target_pos = current_pos;
+        // if (!toggle)
+        // {
+        //     if (current_pos < 262144)
+        //     {
+        //         target_pos += 8000;
+        //         EC_WRITE_S32(domain_pd + target_pos_offset[5], target_pos);
+        //     }
+        //     else
+        //         toggle = true;
+        // }
+        // else
+        // {
+        //     if (current_pos > -262144)
+        //     {
+        //         target_pos -= 8000;
+        //         EC_WRITE_S32(domain_pd + target_pos_offset[5], target_pos);
+        //     }
+        //     else
+        //         toggle = false;
+        // }
 
     }
 
@@ -901,18 +904,18 @@ void ZeroErrInterface::cyclic_pdo_loop_()
     // ecrt_master_application_time(master, TIMESPEC2NS(t));
     // ecrt_master_application_time(master, TIMESPEC2NS(wakeupTime));
 
-    if (sync_ref_counter)
-    {
-        sync_ref_counter--;
-    }
-    else
-    {
-        sync_ref_counter = 1;
-        clock_gettime(CLOCK_REALTIME, &time_ns);
-        ecrt_master_sync_reference_clock_to(master, TIMESPEC2NS(time_ns));
-    }
+    // if (sync_ref_counter)
+    // {
+        // sync_ref_counter--;
+    // }
+    // else
+    // {
+        // sync_ref_counter = 1;
+        // clock_gettime(CLOCK_REALTIME, &time_ns);
+        // ecrt_master_sync_reference_clock_to(master, TIMESPEC2NS(time_ns));
+    // }
     // ecrt_master_sync_reference_clock(master);
-    ecrt_master_sync_slave_clocks(master);
+    // ecrt_master_sync_slave_clocks(master);
 
     // send process data
     ecrt_domain_queue(domain);
@@ -1073,8 +1076,18 @@ int main(int argc, char **argv)
         [&]() {
 
             //* Set thread priority
-            if (!realtime_tools::configure_sched_fifo(sched_get_priority_max(SCHED_FIFO)))
+            if (!realtime_tools::configure_sched_fifo(sched_get_priority_max(SCHED_FIFO) - 9))
                 RCLCPP_WARN(node->get_logger(), "Couldnt enable FIFO RT Scheduling!");
+            
+            cpu_set_t mask;
+            int ret;
+            CPU_ZERO(&mask);
+            CPU_SET(0, &mask);
+            ret = sched_setaffinity(0, sizeof(mask), &mask);
+
+            if (ret != 0){
+                RCLCPP_WARN(node->get_logger(), "Couldn't assign to core 0");
+            }
             
             high_prio_exec_.spin();
             
@@ -1087,7 +1100,7 @@ int main(int argc, char **argv)
 
     //* Set main thread priority
     // struct sched_param param = {};
-    // param.sched_priority = sched_get_priority_max(SCHED_FIFO);
+    // param.sched_priority = sched_get_priority_max(SCHED_FIFO) - 5;
     // RCLCPP_INFO(node->get_logger(), "Using priority %i.\n", param.sched_priority);
     // if (sched_setscheduler(0, SCHED_FIFO, &param) == -1) {
     //     RCLCPP_ERROR(node->get_logger(), "sched_setscheduler failed\n");

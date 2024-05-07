@@ -86,7 +86,7 @@
   </link>
   <joint
     name="j1"
-    type="continuous">
+    type="revolute">
     <origin
       xyz="0.0774999999999998 -0.0775 0.0388999999999997"
       rpy="1.5707963267949 0 2.51744046366525" />
@@ -96,6 +96,8 @@
       link="j1_Link" />
     <axis
       xyz="0 1 0" />
+    <limit
+      effort="1000.0" velocity="0.2" lower="-3.14" upper="3.14"/>
   </joint>
   <link
     name="j2_Link">
@@ -139,7 +141,7 @@
   </link>
   <joint
     name="j2"
-    type="continuous">
+    type="revolute">
     <origin
       xyz="-0.0491744080889805 0.0734000000000008 0.0354152169144622"
       rpy="0 0.946644136870351 3.14159265358979" />
@@ -149,6 +151,8 @@
       link="j2_Link" />
     <axis
       xyz="0 0 1" />
+    <limit
+      effort="1000.0" velocity="0.2" lower="-3.14" upper="3.14"/>
   </joint>
   <link
     name="j3_Link">
@@ -192,7 +196,7 @@
   </link>
   <joint
     name="j3"
-    type="continuous">
+    type="revolute">
     <origin
       xyz="0 -0.425 0"
       rpy="3.14159265358979 0 0" />
@@ -202,6 +206,8 @@
       link="j3_Link" />
     <axis
       xyz="0 0 1" />
+    <limit
+      effort="1000.0" velocity="0.2" lower="-3.14" upper="3.14"/>
   </joint>
   <link
     name="j4_Link">
@@ -245,7 +251,7 @@
   </link>
   <joint
     name="j4"
-    type="continuous">
+    type="revolute">
     <origin
       xyz="0 0.401 0"
       rpy="3.14159263868863 0 0" />
@@ -255,6 +261,8 @@
       link="j4_Link" />
     <axis
       xyz="0 0 1" />
+    <limit
+      effort="1000.0" velocity="0.2" lower="-3.14" upper="3.14"/>
   </joint>
   <link
     name="j5_Link">
@@ -298,7 +306,7 @@
   </link>
   <joint
     name="j5"
-    type="continuous">
+    type="revolute">
     <origin
       xyz="0 -0.0374999756318092 0.0423999994412073"
       rpy="0 0 0" />
@@ -308,6 +316,8 @@
       link="j5_Link" />
     <axis
       xyz="0 1 0" />
+    <limit
+      effort="1000.0" velocity="0.2" lower="-3.14" upper="3.14"/>
   </joint>
   <link
     name="j6_Link">
@@ -351,7 +361,7 @@
   </link>
   <joint
     name="j6"
-    type="continuous">
+    type="revolute">
     <origin
       xyz="0 -0.0485 0.0375"
       rpy="3.1416 0 -1.5708" />
@@ -361,6 +371,8 @@
       link="j6_Link" />
     <axis
       xyz="0 0 1" />
+    <limit
+      effort="1000.0" velocity="0.2" lower="-3.14" upper="3.14"/>
   </joint>
   <link
     name="camera_Link">

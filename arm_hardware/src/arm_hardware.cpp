@@ -32,8 +32,6 @@ namespace arm_hardware
         arm_position_state_.assign(NUM_JOINTS, 0.0);
         arm_position_commands_.assign(NUM_JOINTS, 0.0);
         latest_arm_state_.position.assign(NUM_JOINTS, 0.0);
-        // velocity_states_.assign(6, 0.0);
-        // velocity_commands_.assign(6. 0.0);
 
         // Initialize drive states and adjust_pos_ flags
         for (uint i = 0; i < NUM_JOINTS; i++)
@@ -59,10 +57,6 @@ namespace arm_hardware
             rclcpp::SensorDataQoS(),
             [this](const sensor_msgs::msg::JointState::SharedPtr joint_state){ latest_arm_state_ = *joint_state; }
         );
-
-        //! Temp
-        for (uint i = 0; i < NUM_JOINTS; i++)
-            latest_arm_state_.position[i] = 0.0;
 
 
         //* Make command interface publisher
@@ -108,8 +102,6 @@ namespace arm_hardware
             }
         }
 
-        //? Add velocity state interface?
-
         return state_interfaces;
     }
 
@@ -132,8 +124,6 @@ namespace arm_hardware
                 );
             }
         }
-
-        //? Add velocity command interface?
 
         return command_interfaces;
     }
@@ -233,25 +223,25 @@ namespace arm_hardware
             arm_commands.name[i] = info_.joints[i].name;
 
             // Only issue command if difference b/e state and command passes threshold
-            if (abs(latest_arm_state_.position[i] - arm_position_commands_[i]) >= COUNT_THRESHOLD)
-            {
+            // if (abs(latest_arm_state_.position[i] - arm_position_commands_[i]) >= COUNT_THRESHOLD)
+            // {
                 /**
                  * Joint trajectory controller will convert current joint state to range [-pi, pi].
                  * i.e. if current joint state is 3.74 (rad), joint trajectory controller converts this to -2.54 (rad)
                  * and begins motion planning from -2.54.
                  */
-                if (current_drive_state_[i] == STATIONARY || adjust_pos_[i])
-                    adjust_pos_command_(i);
+                // if (current_drive_state_[i] == STATIONARY || adjust_pos_[i])
+                //     adjust_pos_command_(i);
 
-                current_drive_state_[i] = IN_MOTION;
-            }
-            else
-            {   
-                current_drive_state_[i] = STATIONARY;
+            //     current_drive_state_[i] = IN_MOTION;
+            // }
+            // else
+            // {   
+            //     current_drive_state_[i] = STATIONARY;
 
-                if (adjust_pos_[i])
-                    adjust_pos_command_(i);
-            }
+            //     if (adjust_pos_[i])
+            //         adjust_pos_command_(i);
+            // }
 
             arm_commands.position[i] = arm_position_commands_[i];
 

@@ -9,31 +9,43 @@ default_acceleration_scaling_factor: 0.1
 # Joint limits can be turned off with [has_velocity_limits, has_acceleration_limits]
 joint_limits:
   j1:
+    max_position: 51471.85   # +2^32 encoder counts (~16384 * pi radians)
+    min_position: -51471.85  # -2^32 encoder counts (~16384 * pi radians)
     has_velocity_limits: true
     max_velocity: 2.617   # rad/s, 150 deg/s, 25rpm
     has_acceleration_limits: true
     max_acceleration: 20.94
   j2:
+    max_position: 51471.85   # +2^32 encoder counts (~16384 * pi radians)
+    min_position: -51471.85  # -2^32 encoder counts (~16384 * pi radians)
     has_velocity_limits: true
     max_velocity: 2.617   # rad/s, 150 deg/s, 25rpm
     has_acceleration_limits: true
     max_acceleration: 20.94
   j3:
+    max_position: 51471.85   # +2^32 encoder counts (~16384 * pi radians)
+    min_position: -51471.85  # -2^32 encoder counts (~16384 * pi radians)
     has_velocity_limits: true
     max_velocity: 2.617   # rad/s, 150 deg/s, 25rpm
     has_acceleration_limits: true
     max_acceleration: 20.94
   j4:
+    max_position: 51471.85   # +2^32 encoder counts (~16384 * pi radians)
+    min_position: -51471.85  # -2^32 encoder counts (~16384 * pi radians)
     has_velocity_limits: true
     max_velocity: 3.1415  # rad/s, 180 deg/s, 30rpm
     has_acceleration_limits: true
     max_acceleration: 20.94
   j5:
+    max_position: 51471.85   # +2^32 encoder counts (~16384 * pi radians)
+    min_position: -51471.85  # -2^32 encoder counts (~16384 * pi radians)
     has_velocity_limits: true
     max_velocity: 3.1415  # rad/s, 180 deg/s, 30rpm
     has_acceleration_limits: true
     max_acceleration: 20.94
   j6:
+    max_position: 51471.85   # +2^32 encoder counts (~16384 * pi radians)
+    min_position: -51471.85  # -2^32 encoder counts (~16384 * pi radians)
     has_velocity_limits: true
     max_velocity: 3.1415  # rad/s, 180 deg/s, 30rpm
     has_acceleration_limits: true

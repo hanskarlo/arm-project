@@ -1,10 +1,10 @@
-<library path="zeroerr_hardware">
-  <class name="zeroerr_hardware/ArmHardwareInterface"
-    type="zeroerr_hardware::ArmHardwareInterface"
+<library path="arm_hardware">
+  <class name="arm_hardware/ArmHardwareInterface"
+    type="arm_hardware::ArmHardwareInterface"
     base_class_type="hardware_interface::SystemInterface"
   >
     <description>
-      Hardware interface for aroArm
+      ros2_control hardware interface for arm
     </description>
   </class>
 </library>
