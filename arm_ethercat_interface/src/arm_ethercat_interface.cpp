@@ -283,7 +283,7 @@ bool ZeroErrInterface::set_drive_parameters_()
 
 
         // Profile velocity
-        uint32_t profile_velocity = (i < 3) ? (EROB_110H120_MAX_SPEED / 2) : (EROB_70H100_MAX_SPEED / 2);
+        uint32_t profile_velocity = (i < 3) ? (EROB_110H120_MAX_SPEED) : (EROB_70H100_MAX_SPEED);
         if (ecrt_master_sdo_download(
                 master,
                 i,
@@ -543,7 +543,7 @@ bool ZeroErrInterface::set_drive_parameters_()
         ecrt_slave_config_dc(
             joint_slave_configs[i], 
             ASSIGN_ACTIVATE, 
-            PERIOD_NS*2, 
+            SYNC0_CYCLE, 
             SYNC0_SHIFT, 
             0, 0);
     
@@ -727,8 +727,11 @@ struct timespec timespec_add(struct timespec time1, struct timespec time2)
  */
 void ZeroErrInterface::cyclic_pdo_loop_()
 {
-    ecrt_master_application_time(master, TIMESPEC2NS(wakeupTime));
-    wakeupTime = timespec_add(wakeupTime, cycletime);
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    ecrt_master_application_time(master, TIMESPEC2NS(t));
+    // ecrt_master_application_time(master, TIMESPEC2NS(wakeupTime));
+    // wakeupTime = timespec_add(wakeupTime, cycletime);
     // clock_nanosleep(CLOCK_TO_USE, TIMER_ABSTIME, &wakeupTime, NULL);
 
     // loop_start_time_ = (unsigned long) this->now().nanoseconds();
@@ -899,9 +902,6 @@ void ZeroErrInterface::cyclic_pdo_loop_()
     // It is a good idea to use the target time (not the measured time) as
     // application time, because it is more stable.
     //
-    // struct timespec t;
-    // clock_gettime(CLOCK_REALTIME, &t);
-    // ecrt_master_application_time(master, TIMESPEC2NS(t));
     // ecrt_master_application_time(master, TIMESPEC2NS(wakeupTime));
 
     if (sync_ref_counter)
@@ -911,7 +911,7 @@ void ZeroErrInterface::cyclic_pdo_loop_()
     else
     {
         sync_ref_counter = 1;
-        clock_gettime(CLOCK_REALTIME, &time_ns);
+        clock_gettime(CLOCK_MONOTONIC, &time_ns);
         ecrt_master_sync_reference_clock_to(master, TIMESPEC2NS(time_ns));
     }
     // ecrt_master_sync_reference_clock(master);
@@ -1076,7 +1076,7 @@ int main(int argc, char **argv)
         [&]() {
 
             //* Set thread priority
-            if (!realtime_tools::configure_sched_fifo(sched_get_priority_max(SCHED_FIFO) - 9))
+            if (!realtime_tools::configure_sched_fifo(sched_get_priority_max(SCHED_FIFO) - 19))
                 RCLCPP_WARN(node->get_logger(), "Couldnt enable FIFO RT Scheduling!");
             
             cpu_set_t mask;
@@ -1100,7 +1100,7 @@ int main(int argc, char **argv)
 
     //* Set main thread priority
     // struct sched_param param = {};
-    // param.sched_priority = sched_get_priority_max(SCHED_FIFO) - 5;
+    // param.sched_priority = sched_get_priority_max(SCHED_FIFO) - 20;
     // RCLCPP_INFO(node->get_logger(), "Using priority %i.\n", param.sched_priority);
     // if (sched_setscheduler(0, SCHED_FIFO, &param) == -1) {
     //     RCLCPP_ERROR(node->get_logger(), "sched_setscheduler failed\n");
