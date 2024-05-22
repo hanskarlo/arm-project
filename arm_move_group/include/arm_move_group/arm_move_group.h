@@ -58,6 +58,7 @@ class ArmMoveGroup
         const std::string POSE_DIR = PKG_DIR + "poses/";
         const std::string TRAJ_DIR = PKG_DIR + "trajectories/";
 
+        bool visualize_trajectories_ = true;
         bool joint_space_goal_recv_ = false;
         bool pose_goal_recv_ = false;
         bool linear_trajectory_recv_ = false;
@@ -68,7 +69,6 @@ class ArmMoveGroup
         moveit_msgs::msg::RobotTrajectory trajectory_;
 
         void clear_cb_(const std_msgs::msg::Bool::SharedPtr clear_msg);
-        void timer_cb_();
 
 
         // Feature-set services

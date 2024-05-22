@@ -62,6 +62,14 @@ ArmMoveGroup::ArmMoveGroup()
 	);
 
 
+	// mg_node_->declare_parameter("visualize_trajectory", true);
+	visualize_trajectories_ = node_->get_parameter("visualize_trajectory").as_bool();
+
+	if (visualize_trajectories_)
+		RCLCPP_INFO(node_->get_logger(), "Visualizing trajectories");
+	else
+		RCLCPP_INFO(node_->get_logger(), "Not visualizing trajectories");
+
 	RCLCPP_INFO(node_->get_logger(), "Initialized!");
 }
 
@@ -80,26 +88,32 @@ void ArmMoveGroup::joint_space_goal_cb_(
 	RCLCPP_INFO(node_->get_logger(), "Joint space goal received.");
 	
 
-	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
-	move_group.startStateMonitor();
+	// Node for move group interface
+	rclcpp::NodeOptions node_options;
+	node_options.automatically_declare_parameters_from_overrides(true);
+	auto move_group_node = rclcpp::Node::make_shared("mgn", node_options);
+
+	// Add node to executor and spin in another thread
+	rclcpp::executors::SingleThreadedExecutor executor;
+	executor.add_node(move_group_node);
+	std::thread t([&executor]() { executor.spin(); });
+
+	// Create move group interface using move_group_node
+	auto move_group = moveit::planning_interface::MoveGroupInterface(move_group_node, PLANNING_GROUP);
+	// auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+	
+	
+	// Start monitoring state of arm
+	move_group.startStateMonitor(2.0);
 
 	RCLCPP_INFO(node_->get_logger(), "Planning frame: %s", move_group.getPlanningFrame().c_str());
 	RCLCPP_INFO(node_->get_logger(), "End effector link: %s", move_group.getEndEffectorLink().c_str());
 
 
-	moveit_visual_tools::MoveItVisualTools visual_tools(
-		mg_node_,
-		move_group.getPlanningFrame(),
-		"arm_marker_array",
-		move_group.getRobotModel());
-
-	visual_tools.deleteAllMarkers();
-
-
 	// Use STOMP
 	move_group.setPlanningPipelineId("stomp");
 
-	moveit::core::RobotStatePtr current_state = move_group.getCurrentState();
+	moveit::core::RobotStatePtr current_state = move_group.getCurrentState(2.0);
 	move_group.setStartState(*current_state);
 
 	const moveit::core::JointModelGroup* joint_model_group =
@@ -110,6 +124,9 @@ void ArmMoveGroup::joint_space_goal_cb_(
 
 	std::vector<double> joint_group_positions;
 	current_state->copyJointGroupPositions(joint_model_group, joint_group_positions);
+
+	// for (uint i = 0; i < NUM_JOINTS; i++)
+	// 	RCLCPP_INFO(node_->get_logger(), "J%d: %f", (i + 1), joint_group_positions[i]);
 
 
 	for (uint i = 0; i < NUM_JOINTS; i++)
@@ -136,18 +153,29 @@ void ArmMoveGroup::joint_space_goal_cb_(
 
 	if (success)
 	{
-		bool visualized = visual_tools.publishTrajectoryLine(
-			plan_.trajectory,
-			ee_link,
-			joint_model_group
-		);
+		if (visualize_trajectories_)
+		{
+			moveit_visual_tools::MoveItVisualTools visual_tools(
+				move_group_node,
+				move_group.getPlanningFrame(),
+				"arm_marker_array",
+				move_group.getRobotModel());
 
-		visual_tools.trigger();
-		
-		if (visualized)
-			RCLCPP_INFO(node_->get_logger(), "Motion plan visualized.");
-		else
-			RCLCPP_ERROR(node_->get_logger(), "Motion plan visualization failed\n");
+			visual_tools.deleteAllMarkers();
+
+			bool visualized = visual_tools.publishTrajectoryLine(
+				plan_.trajectory,
+				ee_link,
+				joint_model_group
+			);
+
+			visual_tools.trigger();
+			
+			if (visualized)
+				RCLCPP_INFO(node_->get_logger(), "Motion plan visualized.");
+			else
+				RCLCPP_ERROR(node_->get_logger(), "Motion plan visualization failed\n");
+		}
 
 		RCLCPP_INFO(node_->get_logger(), "Motion plan successful!");
 		response->valid = true;
@@ -157,6 +185,11 @@ void ArmMoveGroup::joint_space_goal_cb_(
 		RCLCPP_ERROR(node_->get_logger(), "Motion plan failed\n");
 		response->valid = false;
 	}
+
+
+	// Stop executor spin and join thread
+	executor.cancel();
+	t.join();
 }
 
 
@@ -166,20 +199,27 @@ void ArmMoveGroup::pose_goal_cb_(
 {
 	RCLCPP_INFO(node_->get_logger(), "PoseGoal service called.");
 
-	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+	
+	// Node for move group interface
+	rclcpp::NodeOptions node_options;
+	node_options.automatically_declare_parameters_from_overrides(true);
+	auto move_group_node = rclcpp::Node::make_shared("mgn", node_options);
 
-	// Setup visual tools
-	moveit_visual_tools::MoveItVisualTools visual_tools(
-		mg_node_,
-		move_group.getPlanningFrame(),
-		"arm_marker_array",
-		move_group.getRobotModel());
+	// Add node to executor and spin in another thread
+	rclcpp::executors::SingleThreadedExecutor executor;
+	executor.add_node(move_group_node);
+	std::thread t([&executor]() { executor.spin(); });
 
-	visual_tools.deleteAllMarkers();
+	// Create move group interface using move_group_node
+	auto move_group = moveit::planning_interface::MoveGroupInterface(move_group_node, PLANNING_GROUP);
+	// auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
 
 
+	// Use STOMP
 	move_group.setPlanningPipelineId("stomp");
 
+
+	// Start monitoring state of arm
 	move_group.startStateMonitor(2.0);
 	moveit::core::RobotStatePtr current_state = move_group.getCurrentState();
 	
@@ -237,18 +277,29 @@ void ArmMoveGroup::pose_goal_cb_(
 		RCLCPP_INFO(node_->get_logger(), "Motion plan successful!\n");
 		response->valid = true;
 
-		bool visualized = visual_tools.publishTrajectoryLine(
-			plan_.trajectory,
-			ee_link,
-			joint_model_group
-		);
+		if (visualize_trajectories_)
+		{
+			moveit_visual_tools::MoveItVisualTools visual_tools(
+				move_group_node,
+				move_group.getPlanningFrame(),
+				"arm_marker_array",
+				move_group.getRobotModel());
 
-		visual_tools.trigger();
+			visual_tools.deleteAllMarkers();
 
-		if (visualized)
-			RCLCPP_INFO(node_->get_logger(), "Motion plan visualized.");
-		else
-			RCLCPP_ERROR(node_->get_logger(), "Motion plan visualization failed\n");
+			bool visualized = visual_tools.publishTrajectoryLine(
+				plan_.trajectory,
+				ee_link,
+				joint_model_group
+			);
+
+			visual_tools.trigger();
+
+			if (visualized)
+				RCLCPP_INFO(node_->get_logger(), "Motion plan visualized.");
+			else
+				RCLCPP_ERROR(node_->get_logger(), "Motion plan visualization failed\n");
+		}
 	}
 	else
 	{
@@ -257,6 +308,9 @@ void ArmMoveGroup::pose_goal_cb_(
 	}
 
 
+	// Stop executor spin and join thread
+	executor.cancel();
+	t.join();
 }
 
 
@@ -264,17 +318,25 @@ void ArmMoveGroup::pose_goal_array_cb_(
 	const std::shared_ptr<PoseGoalArray::Request> request, 
 	std::shared_ptr<PoseGoalArray::Response> response)
 {
-	// Start move group interface
-	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+	RCLCPP_INFO(node_->get_logger(), "PoseGoalArray service call received.");
+
+
+	// Node for move group interface
+	rclcpp::NodeOptions node_options;
+	node_options.automatically_declare_parameters_from_overrides(true);
+	auto move_group_node = rclcpp::Node::make_shared("mgn", node_options);
+
+	// Add node to executor and spin in another thread
+	rclcpp::executors::SingleThreadedExecutor executor;
+	executor.add_node(move_group_node);
+	std::thread t([&executor]() { executor.spin(); });
+
+	// Create move group interface using move_group_node
+	auto move_group = moveit::planning_interface::MoveGroupInterface(move_group_node, PLANNING_GROUP);
+	// auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
 	
-	moveit_visual_tools::MoveItVisualTools visual_tools(
-		mg_node_,
-		move_group.getPlanningFrame(),
-		"arm_marker_array",
-		move_group.getRobotModel());
-
-	visual_tools.deleteAllMarkers();
-
+	
+	// Start monitoring state of arm
 	move_group.startStateMonitor(2.0);
 	moveit::core::RobotStatePtr current_state = move_group.getCurrentState();
 	moveit::core::RobotState start_state(*move_group.getCurrentState());
@@ -290,7 +352,7 @@ void ArmMoveGroup::pose_goal_array_cb_(
 	current_state->copyJointGroupPositions(joint_model_group, joint_group_positions);
 
 
-	// Get type of motion made by pose goal array
+	// Get type of motion
 	const std::string type = request->type;
 
 	if (!strcmp(type.c_str(), "linear"))
@@ -319,18 +381,29 @@ void ArmMoveGroup::pose_goal_array_cb_(
 			RCLCPP_INFO(node_->get_logger(), "Planning cartesian path (%.2f%% achieved)", fraction * 100.0);
 			response->success = true;
 
-			bool visualized = visual_tools.publishTrajectoryLine(
-				trajectory_,
-				ee_link,
-				joint_model_group
-			);
+			if (visualize_trajectories_)
+			{
+				moveit_visual_tools::MoveItVisualTools visual_tools(
+					mg_node_,
+					move_group.getPlanningFrame(),
+					"arm_marker_array",
+					move_group.getRobotModel());
 
-			visual_tools.trigger();
-		
-			if (visualized)
-				RCLCPP_INFO(node_->get_logger(), "Motion plan visualized.");
-			else
-				RCLCPP_ERROR(node_->get_logger(), "Motion plan visualization failed\n");
+				visual_tools.deleteAllMarkers();
+
+				bool visualized = visual_tools.publishTrajectoryLine(
+					trajectory_,
+					ee_link,
+					joint_model_group
+				);
+
+				visual_tools.trigger();
+			
+				if (visualized)
+					RCLCPP_INFO(node_->get_logger(), "Motion plan visualized.");
+				else
+					RCLCPP_ERROR(node_->get_logger(), "Motion plan visualization failed\n");
+			}
 		}
 		else
 		{
@@ -351,11 +424,11 @@ void ArmMoveGroup::pose_goal_array_cb_(
 
 		// First pose in waypoint array used as arc center
 		center.pose = request->waypoints[0];
-		center.header.frame_id = "base_link";
+		center.header.frame_id = "arm_Link";
 
 		// Second pose used as arc endpoint
 		endpoint.pose = request->waypoints[1];
-		endpoint.header.frame_id = "base_link";
+		endpoint.header.frame_id = "arm_Link";
 
 		// Set endpoint as pose target
 		move_group.setPoseTarget(endpoint);
@@ -379,18 +452,29 @@ void ArmMoveGroup::pose_goal_array_cb_(
 			RCLCPP_INFO(node_->get_logger(), "Motion plan successful!\n");
 			response->success = true;
 
-			bool visualized = visual_tools.publishTrajectoryLine(
-				plan_.trajectory,
-				ee_link,
-				joint_model_group
-			);
+			if (visualize_trajectories_)
+			{
+				moveit_visual_tools::MoveItVisualTools visual_tools(
+					mg_node_,
+					move_group.getPlanningFrame(),
+					"arm_marker_array",
+					move_group.getRobotModel());
 
-			visual_tools.trigger();
-		
-		if (visualized)
-			RCLCPP_INFO(node_->get_logger(), "Motion plan visualized.");
-		else
-			RCLCPP_ERROR(node_->get_logger(), "Motion plan visualization failed\n");
+				visual_tools.deleteAllMarkers();
+
+				bool visualized = visual_tools.publishTrajectoryLine(
+					plan_.trajectory,
+					ee_link,
+					joint_model_group
+				);
+
+				visual_tools.trigger();
+			
+				if (visualized)
+					RCLCPP_INFO(node_->get_logger(), "Motion plan visualized.");
+				else
+					RCLCPP_ERROR(node_->get_logger(), "Motion plan visualization failed\n");
+			}
 		}
 		else
 		{
@@ -405,6 +489,11 @@ void ArmMoveGroup::pose_goal_array_cb_(
 		RCLCPP_ERROR(node_->get_logger(), "Unrecognized pose goal array type (%s), see PoseGoalArray.srv", type.c_str());
 		response->success = false;
 	}
+
+
+	// Stop executor spin and join thread
+	executor.cancel();
+	t.join();
 }
 
 
@@ -415,7 +504,21 @@ void ArmMoveGroup::stop_cb_(
 	// Supress compiler warning
 	const auto rq = request;
 
-	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+
+	// Node for move group interface
+	rclcpp::NodeOptions node_options;
+	node_options.automatically_declare_parameters_from_overrides(true);
+	auto move_group_node = rclcpp::Node::make_shared("mgn", node_options);
+
+	// Add node to executor and spin in another thread
+	rclcpp::executors::SingleThreadedExecutor executor;
+	executor.add_node(move_group_node);
+	std::thread t([&executor]() { executor.spin(); });
+
+	// Create move group interface using move_group_node
+	auto move_group = moveit::planning_interface::MoveGroupInterface(move_group_node, PLANNING_GROUP);
+	// auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+
 
 	try
 	{
@@ -476,13 +579,6 @@ void ArmMoveGroup::clear_cb_(const std_msgs::msg::Bool::SharedPtr clear_msg)
 }
 
 
-void ArmMoveGroup::timer_cb_()
-{
-	RCLCPP_INFO(mg_node_->get_logger(), "Spinning");
-	std::cout << "spinning\n"; 
-}
-
-
 void ArmMoveGroup::save_cb_(
 	const std::shared_ptr<Save::Request> request, 
 	std::shared_ptr<Save::Response> response)
@@ -495,8 +591,22 @@ void ArmMoveGroup::save_cb_(
 
 	if (!strcmp(type.c_str(), "pose"))
 	{
-		// Start move group node state monitor
-		auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+		// Node for move group interface
+		rclcpp::NodeOptions node_options;
+		node_options.automatically_declare_parameters_from_overrides(true);
+		auto move_group_node = rclcpp::Node::make_shared("mgn", node_options);
+
+		// Add node to executor and spin in another thread
+		rclcpp::executors::SingleThreadedExecutor executor;
+		executor.add_node(move_group_node);
+		std::thread t([&executor]() { executor.spin(); });
+
+		// Create move group interface using move_group_node
+		auto move_group = moveit::planning_interface::MoveGroupInterface(move_group_node, PLANNING_GROUP);
+		// auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+		
+		
+		// Start monitoring state of arm
 		move_group.startStateMonitor(2.0);
 
 		// Get current state
@@ -557,6 +667,11 @@ void ArmMoveGroup::save_cb_(
 			response->saved = false;
 		}
 
+
+		// Stop executor spin and join thread
+		executor.cancel();
+		t.join();
+
 	}
 	else if (!strcmp(type.c_str(), "trajectory"))
 	{
@@ -613,7 +728,23 @@ void ArmMoveGroup::execute_cb_(
 	// Supress compiler warning
 	const auto rq = request;
 
-	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+
+	// Node for move group interface
+	rclcpp::NodeOptions node_options;
+	node_options.automatically_declare_parameters_from_overrides(true);
+	auto move_group_node = rclcpp::Node::make_shared("mgn", node_options);
+
+	// Add node to executor and spin in another thread
+	rclcpp::executors::SingleThreadedExecutor executor;
+	executor.add_node(move_group_node);
+	std::thread t([&executor]() { executor.spin(); });
+
+	// Create move group interface using move_group_node
+	auto move_group = moveit::planning_interface::MoveGroupInterface(move_group_node, PLANNING_GROUP);
+	// auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+	
+	
+	// Start monitoring state of arm
 	move_group.startStateMonitor(2.0);
 	move_group.setStartStateToCurrentState();
 
@@ -652,6 +783,10 @@ void ArmMoveGroup::execute_cb_(
 	}
 
 
+	// Stop executor spin and join thread
+	executor.cancel();
+	t.join();
+
 }
 
 
@@ -659,8 +794,19 @@ void ArmMoveGroup::execute_saved_cb_(
 	const std::shared_ptr<MoveToSaved::Request> request, 
 	std::shared_ptr<MoveToSaved::Response> response)
 {
-	// Start move group interface
-	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+	// Node for move group interface
+	rclcpp::NodeOptions node_options;
+	node_options.automatically_declare_parameters_from_overrides(true);
+	auto move_group_node = rclcpp::Node::make_shared("mgn", node_options);
+
+	// Add node to executor and spin in another thread
+	rclcpp::executors::SingleThreadedExecutor executor;
+	executor.add_node(move_group_node);
+	std::thread t([&executor]() { executor.spin(); });
+
+	// Create move group interface using move_group_node
+	auto move_group = moveit::planning_interface::MoveGroupInterface(move_group_node, PLANNING_GROUP);
+	// auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
 
 
 	// Pose or trajectory
@@ -768,6 +914,11 @@ void ArmMoveGroup::execute_saved_cb_(
 		response->executed = false;
 	}
 
+
+	// Stop executor spin and join thread
+	executor.cancel();
+	t.join();
+
 }
 
 
@@ -778,13 +929,27 @@ void ArmMoveGroup::get_state_cb_(const std::shared_ptr<GetState::Request> reques
 
 	RCLCPP_INFO(node_->get_logger(), "Received GetState service call.");
 
-	// Start move group interface
-	auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+
+	// Node for move group interface
+	rclcpp::NodeOptions node_options;
+	node_options.automatically_declare_parameters_from_overrides(true);
+	auto move_group_node = rclcpp::Node::make_shared("mgn", node_options);
+
+	// Add node to executor and spin in another thread
+	rclcpp::executors::SingleThreadedExecutor executor;
+	executor.add_node(move_group_node);
+	std::thread t([&executor]() { executor.spin(); });
+
+	// Create move group interface using move_group_node
+	auto move_group = moveit::planning_interface::MoveGroupInterface(move_group_node, PLANNING_GROUP);
+	// auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+	
+	
+	// Start monitoring state of arm
 	move_group.startStateMonitor(2.0);
 
-	RCLCPP_INFO(node_->get_logger(), "Getting end effector (%s) state.", move_group.getEndEffectorLink().c_str());
 
-	// Get end effector coordinates in arm_Link frame
+	// Get end effector coordinates in arm_link frame
 	response->coordinates.x = move_group.getCurrentPose().pose.position.x;
 	response->coordinates.y = move_group.getCurrentPose().pose.position.y;
 	response->coordinates.z = move_group.getCurrentPose().pose.position.z;
@@ -802,6 +967,10 @@ void ArmMoveGroup::get_state_cb_(const std::shared_ptr<GetState::Request> reques
 
 		// RCLCPP_INFO(node_->get_logger(), "J%d: %d degrees", i, deg);
 	}
+
+	// Stop executor spin and join thread
+	executor.cancel();
+	t.join();
 }
 
 
@@ -813,7 +982,7 @@ int main(int argc, char** argv)
 	auto arm_move_group = ArmMoveGroup();
 
 	rclcpp::executors::MultiThreadedExecutor executor;
-	executor.add_node(arm_move_group.mg_node_);
+	// executor.add_node(arm_move_group.mg_node_);
 	executor.add_node(arm_move_group.node_);
 	// std::thread([&executor]() { executor.spin(); }).detach();
 
