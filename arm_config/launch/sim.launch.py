@@ -18,9 +18,9 @@ def generate_launch_description():
     )
 
     moveit_config = (
-        MoveItConfigsBuilder("zeroerr_arm", package_name="arm_config")
+        MoveItConfigsBuilder("ArmProject", package_name="arm_config")
         .robot_description(
-            file_path="config/zeroerr_arm.urdf.xacro",
+            file_path="config/zeroerr_arm_servo.urdf.xacro",
             mappings={"ros2_control_hardware_type": LaunchConfiguration("ros2_control_hardware_type")},
         )
         .robot_description_semantic(file_path="config/zeroerr_arm.srdf")
@@ -28,6 +28,7 @@ def generate_launch_description():
             publish_robot_description=True, 
             publish_robot_description_semantic=True
         )
+        .joint_limits(file_path="config/servo_joint_limits.yaml")
         .trajectory_execution(file_path="config/moveit_controllers.yaml")
         .planning_pipelines(
             pipelines=[

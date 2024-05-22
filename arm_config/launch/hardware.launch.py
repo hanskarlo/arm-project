@@ -23,7 +23,7 @@ def generate_launch_description():
     )
 
     moveit_config = (
-        MoveItConfigsBuilder("zeroerr_arm", package_name="arm_config")
+        MoveItConfigsBuilder("ArmProject", package_name="arm_config")
         .robot_description(
             file_path="config/zeroerr_arm.urdf.xacro",
             mappings={"ros2_control_hardware_type": LaunchConfiguration("ros2_control_hardware_type")},
@@ -52,6 +52,9 @@ def generate_launch_description():
         output="screen",
         parameters=[moveit_config.to_dict()],
         arguments=["--ros-args", "--log-level", "info"],
+        remappings=[
+            ('/robot_description', '/arm/robot_description')
+        ]
     )
 
     arm_interface = Node(
@@ -97,6 +100,9 @@ def generate_launch_description():
         executable="robot_state_publisher",
         name="robot_state_publisher",
         output="both",
+        remappings=[
+            ('/robot_description', '/arm/robot_description')
+        ],
         parameters=[moveit_config.robot_description],
     )
 
@@ -127,7 +133,6 @@ def generate_launch_description():
         package="controller_manager",
         executable="spawner",
         arguments=["arm_group_controller", "-c", "/controller_manager"],
-        # prefix=["sudo -E"]
     )
     
     return LaunchDescription(

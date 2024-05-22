@@ -14,7 +14,7 @@ def generate_launch_description():
 
     # Use real hardware
     """
-    Change hardware type parameter in zeroerr_arm.ros2_control.xacro to use
+    Change hardware type parameter in zeroerr_arm_servo.ros2_control.xacro to use
     arm_hardware/ArmHardwareInterface plugin (actual hardware)
     """
     ros2_control_hardware_type = DeclareLaunchArgument(
@@ -24,7 +24,7 @@ def generate_launch_description():
     )
 
     moveit_config = (
-        MoveItConfigsBuilder("ArmProjectCts", package_name="arm_config")
+        MoveItConfigsBuilder("ArmProject", package_name="arm_config")
         .robot_description(
             file_path="config/zeroerr_arm_servo.urdf.xacro",
             mappings={"ros2_control_hardware_type": LaunchConfiguration("ros2_control_hardware_type")},
