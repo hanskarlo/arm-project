@@ -12,16 +12,19 @@ from moveit_configs_utils import MoveItConfigsBuilder
 def generate_launch_description():
 
     ros2_control_hardware_type = DeclareLaunchArgument(
-        "ros2_control_hardware_type",
-        default_value="mock_components",
-        description="ROS 2 control hardware interface type to use for the launch file -- possible values: [mock_components, isaac]",
+        "hardware_type",
+        default_value="sim",
+        description="ROS 2 control hardware interface type to use for the launch file -- possible values: [sim, isaac]",
     )
 
     moveit_config = (
         MoveItConfigsBuilder("ArmProject", package_name="arm_config")
         .robot_description(
             file_path="config/zeroerr_arm_servo.urdf.xacro",
-            mappings={"ros2_control_hardware_type": LaunchConfiguration("ros2_control_hardware_type")},
+            mappings={
+                "ros2_control_hardware_type": LaunchConfiguration("hardware_type"),
+                "control_mode": LaunchConfiguration("control_mode")
+            },
         )
         .robot_description_semantic(file_path="config/zeroerr_arm.srdf")
         .planning_scene_monitor(

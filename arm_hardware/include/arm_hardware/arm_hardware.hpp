@@ -118,8 +118,6 @@ namespace arm_hardware
                     return default_value; // return default_value as topic
             }
 
-            void adjust_pos_command_(const uint joint_num);
-
             // Hardware interface node
             rclcpp::Node::SharedPtr hw_node_;
 
@@ -134,6 +132,9 @@ namespace arm_hardware
             // Position command interface vector
             std::vector<double> arm_position_commands_;
 
+            // JointState message to be read by arm`
+            sensor_msgs::msg::JointState arm_commands;
+
             static const uint NUM_JOINTS = 6;
 
             const double PI = 3.141592654;
@@ -142,14 +143,21 @@ namespace arm_hardware
             // Flag indicating enabling joint commands to be sent
             bool commands_ready_ = false;
 
-            // Flag to signal command interface correction
-            bool adjust_pos_[NUM_JOINTS];
+            // Position of joints at start
+            double starting_pos_[NUM_JOINTS];
+            
+            /// Flag indicating start pose was stored
+            bool start_pose_recv_ = false;
 
-            enum DriveState{
-                IN_MOTION,
-                STATIONARY
+            /**
+             * @brief Indicates if in motion planning or manual servo mode(s)
+             * 
+             */
+            enum ControlMode{
+                PLAN,
+                SERVO
             };
-            DriveState current_drive_state_[NUM_JOINTS];
+            ControlMode ctrl_mode = PLAN;
 
     };
 

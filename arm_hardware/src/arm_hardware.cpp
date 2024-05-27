@@ -22,22 +22,32 @@ namespace arm_hardware
         }
         LOG_INFO("[on_init] ros2_control URDF loaded");
 
+
+        // LOG_INFO("[on_init] ros2_control hardware parameters: ");
+        // for(auto it = info.hardware_parameters.begin(); it != info.hardware_parameters.end(); ++it)
+        // {
+        //     LOG_INFO(it->first.c_str());
+        //     LOG_INFO(it->second.c_str());
+        // }        
+
         // if (info_.joints.size() == NUM_JOINTS)
         //     LOG_INFO("[on_init] 6 joints loaded from urdf");
 
         // for (int i = 0; i < NUM_JOINTS; i++)
         //     LOG_INFO(info_.joints[i].name.c_str());
 
+
         //* Arm has 6 joints (6 positions)
         arm_position_state_.assign(NUM_JOINTS, 0.0);
         arm_position_commands_.assign(NUM_JOINTS, 0.0);
         latest_arm_state_.position.assign(NUM_JOINTS, 0.0);
+        arm_commands.name.resize(NUM_JOINTS);
+        arm_commands.position.assign(NUM_JOINTS, 0.0);
 
-        // Initialize drive states and adjust_pos_ flags
+        // Initialize joint names
         for (uint i = 0; i < NUM_JOINTS; i++)
         {
-            adjust_pos_[i] = false;
-            current_drive_state_[i] = STATIONARY;
+            arm_commands.name[i] = info_.joints[i].name;
         }
 
         //* Add random ID to prevent warnings about multiple publishers within the same node
@@ -65,6 +75,26 @@ namespace arm_hardware
             get_hw_topic_param("command_interface_topic", "arm/command"),
             rclcpp::QoS(1)
         );
+
+
+        const std::string ctrl_mode_param =  get_hw_topic_param("control_mode", "plan");
+        LOG_INFO("[on_init] Control mode: ");
+        LOG_INFO(ctrl_mode_param.c_str());
+        
+        if (strcmp(ctrl_mode_param.c_str(), "servo") == 0)
+        {
+            // LOG_INFO("Servo mode");
+            ctrl_mode = SERVO;
+        }
+        else if (strcmp(ctrl_mode_param.c_str(), "plan") == 0)
+        {
+            ctrl_mode = PLAN;
+        }
+        else
+        {
+            LOG_ERR("[on_init] Unrecognized control mode -- possible values ['plan', 'servo']");
+            return CallbackReturn::FAILURE;
+        }
 
 
         LOG_INFO("[on_init] Finished successfully!");
@@ -131,49 +161,32 @@ namespace arm_hardware
 
     hardware_interface::return_type ArmHardwareInterface::read(const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
     {
-        // if node shutdown(), re-spin
+        uint count = 0;
+
+        // Spin node to read and update arm state
         if (rclcpp::ok()) rclcpp::spin_some(hw_node_); 
 
         //* Update arm_position_state_ with position read from arm/state topic
         for (uint i = 0; i < NUM_JOINTS; i++)
+        {
             arm_position_state_[i] = latest_arm_state_.position[i];
 
+            // When all motors reach OP/Operation enabled
+            if (latest_arm_state_.position[i] != 0.0)
+                count++;
+        }
+
+        // Store starting position
+        if (count == NUM_JOINTS && !start_pose_recv_)
+        {
+            for (uint i = 0; i < NUM_JOINTS; i++)
+                starting_pos_[i] = latest_arm_state_.position[i];
+        
+            start_pose_recv_ = true;
+        }
+
+
         return hardware_interface::return_type::OK;
-    }
-
-
-    void ArmHardwareInterface::adjust_pos_command_(const uint joint_num)
-    {
-        if (latest_arm_state_.position[joint_num] < -PI)
-        {
-            uint pi_factor = 1;
-            if ( abs(latest_arm_state_.position[joint_num]) > (2*PI) )
-                pi_factor = abs((latest_arm_state_.position[joint_num] / (2*PI)));
-
-            // RCLCPP_INFO(rclcpp::get_logger(LOGGER), "Adjusting J%u pos cmd from %f with pi factor %u", i, arm_position_commands_[i], pi_factor);
-
-            arm_position_commands_[joint_num] -= (2*PI) * (pi_factor);
-
-
-            // Begin adjusting position command interface for this joint
-            adjust_pos_[joint_num] = true;
-        }
-        else if(latest_arm_state_.position[joint_num] > PI)
-        {
-            uint pi_factor = 1;
-            if ( latest_arm_state_.position[joint_num] > (2*PI) )
-                pi_factor = (latest_arm_state_.position[joint_num] / (2*PI));
-
-            arm_position_commands_[joint_num] += (2*PI) * (pi_factor);
-
-            // Begin adjusting position command interface for this joint
-            adjust_pos_[joint_num] = true;
-        }
-        else
-        {
-            // Don't adjust position command interface
-            adjust_pos_[joint_num] = false;
-        }
     }
 
 
@@ -184,9 +197,25 @@ namespace arm_hardware
          * all joints to go to 0. Joint commands must be the same as the current joint states 
          * before issuing commands. 
          */
-        if (!commands_ready_)
+        if (!commands_ready_ && (ctrl_mode == PLAN))
         {
             uint count = 0;
+            // RCLCPP_INFO(rclcpp::get_logger(LOGGER), "arm_position_commands_: [%f, %f, %f, %f, %f, %f]", 
+            //                                                                     arm_position_commands_[0],
+            //                                                                     arm_position_commands_[1],
+            //                                                                     arm_position_commands_[2],
+            //                                                                     arm_position_commands_[3],
+            //                                                                     arm_position_commands_[4],
+            //                                                                     arm_position_commands_[5]);
+
+            // RCLCPP_INFO(rclcpp::get_logger(LOGGER), "latest_arm_state_.position: %f, %f, %f, %f, %f, %f]", 
+            //                                                                     latest_arm_state_.position[0],
+            //                                                                     latest_arm_state_.position[1],
+            //                                                                     latest_arm_state_.position[2],
+            //                                                                     latest_arm_state_.position[3],
+            //                                                                     latest_arm_state_.position[4],
+            //                                                                     latest_arm_state_.position[5]);
+            
             for (uint i = 0; i < NUM_JOINTS; i++)
             {
                 if (arm_position_commands_[i] == 0.0 && latest_arm_state_.position[i] != 0.0)
@@ -199,6 +228,17 @@ namespace arm_hardware
                 }
             }
 
+            // RCLCPP_INFO(rclcpp::get_logger(LOGGER), "count: %d", count);
+            // RCLCPP_INFO(rclcpp::get_logger(LOGGER), "arm_position_commands_: [%f, %f, %f, %f, %f, %f]", 
+            //                                                                     arm_position_commands_[0],
+            //                                                                     arm_position_commands_[1],
+            //                                                                     arm_position_commands_[2],
+            //                                                                     arm_position_commands_[3],
+            //                                                                     arm_position_commands_[4],
+            //                                                                     arm_position_commands_[5]);
+
+
+
             if (count == NUM_JOINTS)
                 commands_ready_ = true;
             else
@@ -206,11 +246,15 @@ namespace arm_hardware
         }
 
 
-        // JointState message to be read by arm
-        sensor_msgs::msg::JointState arm_commands;
+        // RCLCPP_INFO(rclcpp::get_logger(LOGGER), "arm_position_commands_: [%f, %f, %f, %f, %f, %f]", 
+        //                                                             arm_position_commands_[0],
+        //                                                             arm_position_commands_[1],
+        //                                                             arm_position_commands_[2],
+        //                                                             arm_position_commands_[3],
+        //                                                             arm_position_commands_[4],
+        //                                                             arm_position_commands_[5]);
 
-        arm_commands.name.resize(NUM_JOINTS);
-        arm_commands.position.assign(NUM_JOINTS, 0.0);
+
 
         // Get timestamp
         auto timestamp = hw_node_->now();
@@ -220,30 +264,16 @@ namespace arm_hardware
         //* Fill arm_commands with updated arm_position_commands from command interface
         for (uint i = 0; i < NUM_JOINTS; i++)
         {
-            arm_commands.name[i] = info_.joints[i].name;
-
-            // Only issue command if difference b/e state and command passes threshold
-            // if (abs(latest_arm_state_.position[i] - arm_position_commands_[i]) >= COUNT_THRESHOLD)
-            // {
-                /**
-                 * Joint trajectory controller will convert current joint state to range [-pi, pi].
-                 * i.e. if current joint state is 3.74 (rad), joint trajectory controller converts this to -2.54 (rad)
-                 * and begins motion planning from -2.54.
-                 */
-                // if (current_drive_state_[i] == STATIONARY || adjust_pos_[i])
-                //     adjust_pos_command_(i);
-
-            //     current_drive_state_[i] = IN_MOTION;
-            // }
-            // else
-            // {   
-            //     current_drive_state_[i] = STATIONARY;
-
-            //     if (adjust_pos_[i])
-            //         adjust_pos_command_(i);
-            // }
-
-            arm_commands.position[i] = arm_position_commands_[i];
+            if (ctrl_mode == PLAN)
+            {
+                arm_commands.position[i] = arm_position_commands_[i];
+            }
+            else if (ctrl_mode == SERVO)
+            {
+                // Use starting position as reference 
+                // arm_position_commands start from 0 when servoing
+                arm_commands.position[i] = starting_pos_[i] + arm_position_commands_[i];
+            }
 
         }
 
