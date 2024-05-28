@@ -36,27 +36,20 @@ endforeach()
 
 # Keyboard control example for servo
 add_executable(servo_keyboard_input src/servo_keyboard_input.cpp)
-# target_include_directories(zeroerr_servo PUBLIC include)
+# target_include_directories(arm_servo PUBLIC include)
 ament_target_dependencies(
   servo_keyboard_input 
-  "control_msgs"
-  "geometry_msgs"
-  "moveit_core"
-  "moveit_msgs"
-  "moveit_ros_planning"
-  "moveit_ros_planning_interface"
-  "pluginlib"
-  "rclcpp"
-  "rclcpp_components"
-  "realtime_tools"
-  "sensor_msgs"
-  "std_msgs"
-  "std_srvs"
-  "tf2_eigen"
-  "trajectory_msgs"
+  ${THIS_PACKAGE_INCLUDE_DEPENDS}
 )
 
-install(TARGETS servo_keyboard_input
+add_executable(game_controller src/game_controller.cpp)
+# target_include_directories(arm_servo PUBLIC include)
+ament_target_dependencies(
+  game_controller
+  ${THIS_PACKAGE_INCLUDE_DEPENDS}
+)
+
+install(TARGETS servo_keyboard_input game_controller
   DESTINATION lib/${PROJECT_NAME})
 
 
