@@ -341,31 +341,20 @@ void GameController::joy_cb_(const sensor_msgs::msg::Joy::SharedPtr joy_msg)
         }
 
 
-        // DPAD RIGHT/LEFT used to switch between planes
-        if (joy_msg->buttons[DPAD_RIGHT] == PRESSED && dpad_toggle_)
-        {
-            if (cartesian_plane_toggle_)
-                return; 
-            else
-                cartesian_plane_toggle_ = true;
-
-            RCLCPP_INFO(nh_->get_logger(), "Switching Left Analog Stick to ");
-
-            dpad_toggle_ = false;
-            return;
-        }
-        else if (joy_msg->buttons[DPAD_LEFT] == PRESSED && dpad_toggle_)
-        {
-            if (cartesian_plane_toggle_)
-                cartesian_plane_toggle_ = false;
-
-            RCLCPP_INFO(nh_->get_logger(), "Controlling J%d", (joint_num_ + 1));
-
-            dpad_toggle_ = false;
-            return;
-        }
+        // TODO: DPAD RIGHT/LEFT used to switch between planes
+        // if (joy_msg->buttons[DPAD_RIGHT] == PRESSED && dpad_toggle_)
+        // {
+        //     dpad_toggle_ = false;
+        //     return;
+        // }
+        // else if (joy_msg->buttons[DPAD_LEFT] == PRESSED && dpad_toggle_)
+        // {
+        //     dpad_toggle_ = false;
+        //     return;
+        // }
 
         
+        // LEFT STICK used to move end effector in xy plane
         if (joy_msg->axes[LEFT_STICK_X] || joy_msg->axes[LEFT_STICK_Y])
         {
             twist_msg->twist.linear.x = cartesian_step_size_ * joy_msg->axes[LEFT_STICK_X];
@@ -373,9 +362,6 @@ void GameController::joy_cb_(const sensor_msgs::msg::Joy::SharedPtr joy_msg)
             twist_pub_->publish(std::move(twist_msg));
             return;
         }
-
-
-
 
     }
 
