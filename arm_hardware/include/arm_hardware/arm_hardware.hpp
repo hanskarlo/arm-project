@@ -22,6 +22,8 @@
 #include <rclcpp/subscription.hpp>
 
 #include <sensor_msgs/msg/joint_state.hpp>
+#include <std_msgs/msg/bool.hpp>
+#include <std_srvs/srv/set_bool.hpp>
 
 namespace arm_hardware
 {
@@ -118,11 +120,15 @@ namespace arm_hardware
                     return default_value; // return default_value as topic
             }
 
+            void adjust_pos_command_(const uint joint_num);
+
             // Hardware interface node
             rclcpp::Node::SharedPtr hw_node_;
 
             rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_states_sub_;
+            rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr restart_pos_sub_;
             rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_commands_pub_;
+            rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr sw_hw_ctrl_mode_srv_;
 
             sensor_msgs::msg::JointState latest_arm_state_;
 
@@ -132,7 +138,7 @@ namespace arm_hardware
             // Position command interface vector
             std::vector<double> arm_position_commands_;
 
-            // JointState message to be read by arm`
+            // JointState message to be read by arm
             sensor_msgs::msg::JointState arm_commands;
 
             static const uint NUM_JOINTS = 6;
@@ -158,6 +164,12 @@ namespace arm_hardware
                 SERVO
             };
             ControlMode ctrl_mode = PLAN;
+
+            enum DriveState{
+                IN_MOTION,
+                STATIONARY
+            };
+            DriveState current_drive_state_[NUM_JOINTS];
 
     };
 

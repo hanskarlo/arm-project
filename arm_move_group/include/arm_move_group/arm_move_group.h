@@ -16,6 +16,7 @@
 #include <moveit_visual_tools/moveit_visual_tools.h>
 
 #include <std_msgs/msg/bool.hpp>
+#include <std_msgs/msg/string.hpp>
 #include <moveit_msgs/msg/display_robot_state.hpp>
 #include <moveit_msgs/msg/display_trajectory.hpp>
 #include <moveit_msgs/msg/attached_collision_object.hpp>
@@ -59,9 +60,13 @@ class ArmMoveGroup
         const std::string TRAJ_DIR = PKG_DIR + "trajectories/";
 
         bool visualize_trajectories_ = true;
+        bool servoing_ = false;
+
         bool joint_space_goal_recv_ = false;
         bool pose_goal_recv_ = false;
         bool linear_trajectory_recv_ = false;
+
+
 
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr collision_obj_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_clear_sub_;      
@@ -92,6 +97,7 @@ class ArmMoveGroup
 
         rclcpp::Service<GetState>::SharedPtr get_state_srv_;
 
+        rclcpp::Client<Trigger>::SharedPtr pause_servo_input_cli_;
 
         // Service callbacks
         void save_cb_(const std::shared_ptr<Save::Request> request, std::shared_ptr<Save::Response> response);

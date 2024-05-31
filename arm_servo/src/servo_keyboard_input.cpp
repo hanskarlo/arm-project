@@ -37,6 +37,9 @@
 #include <control_msgs/msg/joint_jog.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <moveit_msgs/srv/servo_command_type.hpp>
+#include <std_msgs/msg/bool.hpp>
+#include <std_srvs/srv/trigger.hpp>
+#include <std_srvs/srv/set_bool.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <signal.h>
 #include <stdio.h>
@@ -67,6 +70,7 @@ constexpr int8_t KEYCODE_W = 0x77;
 constexpr int8_t KEYCODE_E = 0x65;
 constexpr int8_t KEYCODE_I = 0x69;
 constexpr int8_t KEYCODE_O = 0x6F;
+constexpr int8_t KEYCODE_P = 0x70;
 }  // namespace
 
 // Some constants used in the Servo Teleop demo
@@ -124,28 +128,93 @@ private:
   void spin();
 
   rclcpp::Node::SharedPtr nh_;
+  rclcpp::Node::SharedPtr service_node_;
 
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr reset_start_pos_pub_;
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr twist_pub_;
   rclcpp::Publisher<control_msgs::msg::JointJog>::SharedPtr joint_pub_;
   rclcpp::Client<moveit_msgs::srv::ServoCommandType>::SharedPtr switch_input_;
+  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr pause_servo_cli_;
+  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr sw_hw_ctrl_mode_cli_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr pause_servo_input_srv_;
+
+  void pause_servo_cb_(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, std::shared_ptr<std_srvs::srv::Trigger::Response> response);
 
   std::shared_ptr<moveit_msgs::srv::ServoCommandType::Request> request_;
   double joint_vel_cmd_;       // rad/s
   double cartesian_step_size_; // meters
   std::string command_frame_id_;
+  bool input_paused_;
 };
 
-KeyboardServo::KeyboardServo() : joint_vel_cmd_(0.1), cartesian_step_size_(0.1), command_frame_id_{ "arm_Link" }
+KeyboardServo::KeyboardServo() : 
+  joint_vel_cmd_(0.1), 
+  cartesian_step_size_(0.1), 
+  command_frame_id_{ "arm_Link" },
+  input_paused_(false)
 {
   nh_ = rclcpp::Node::make_shared("servo_keyboard_input");
+  service_node_ = rclcpp::Node::make_shared("servo_keyboard_input_sn_");
 
   request_ = std::make_shared<moveit_msgs::srv::ServoCommandType::Request>();
 
   twist_pub_ = nh_->create_publisher<geometry_msgs::msg::TwistStamped>(TWIST_TOPIC, ROS_QUEUE_SIZE);
   joint_pub_ = nh_->create_publisher<control_msgs::msg::JointJog>(JOINT_TOPIC, ROS_QUEUE_SIZE);
 
+  reset_start_pos_pub_ = nh_->create_publisher<std_msgs::msg::Bool>("arm/servo/reset", ROS_QUEUE_SIZE);
+
   // Client for switching input types
   switch_input_ = nh_->create_client<moveit_msgs::srv::ServoCommandType>("servo_node/switch_command_type");
+
+  // Client to un/pause servo node
+  pause_servo_cli_ = service_node_->create_client<std_srvs::srv::SetBool>("servo_node/pause_servo");
+
+  sw_hw_ctrl_mode_cli_ = service_node_->create_client<std_srvs::srv::SetBool>("arm_hw_node/toggle_servo_mode");
+
+  // Service for pausing keyboard input and to pause servo node
+  pause_servo_input_srv_ = nh_->create_service<std_srvs::srv::Trigger>(
+    "pause_servo_input", 
+    std::bind(&KeyboardServo::pause_servo_cb_, this, std::placeholders::_1, std::placeholders::_2));
+}
+
+void KeyboardServo::pause_servo_cb_(
+  const std::shared_ptr<std_srvs::srv::Trigger::Request> request, 
+  std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+{
+  // Suppress compiler warnings
+  (void) request; 
+  (void) response;
+
+  RCLCPP_INFO(nh_->get_logger(), "Keyboard input paused.");
+  input_paused_ = true;
+
+  auto req = std::make_shared<std_srvs::srv::SetBool::Request>();
+  req->data = true;
+
+  auto future = pause_servo_cli_->async_send_request(req);
+
+  if (rclcpp::spin_until_future_complete(service_node_, future) == rclcpp::FutureReturnCode::SUCCESS)
+  {
+    RCLCPP_INFO(nh_->get_logger(), "Called pause_servo service: %s", future.get()->message.c_str());
+  }
+  else
+  {
+    RCLCPP_ERROR(nh_->get_logger(), "Failed to call pause_servo service");
+  }
+
+  
+  req->data = false;
+  future = sw_hw_ctrl_mode_cli_->async_send_request(req);
+
+  if (rclcpp::spin_until_future_complete(service_node_, future) == rclcpp::FutureReturnCode::SUCCESS)
+  {
+    RCLCPP_INFO(nh_->get_logger(), "Called pause_servo service: %s", future.get()->message.c_str());
+  }
+  else
+  {
+    RCLCPP_ERROR(nh_->get_logger(), "Failed to call pause_servo service");
+  }
+
 }
 
 KeyboardReader input;
@@ -210,6 +279,57 @@ int KeyboardServo::keyLoop()
     {
       perror("read():");
       return -1;
+    }
+
+    if (input_paused_)
+    {
+      if (c == KEYCODE_P)
+      {
+        RCLCPP_INFO(nh_->get_logger(), "Keyboard input unpaused!");
+        input_paused_ = false;
+
+        // std_msgs::msg::Bool msg;
+        // msg.data = true;
+        // reset_start_pos_pub_->publish(msg);
+
+        auto req = std::make_shared<std_srvs::srv::SetBool::Request>();
+        req->data = false;
+
+        auto future = pause_servo_cli_->async_send_request(req);
+
+        if (rclcpp::spin_until_future_complete(service_node_, future) == rclcpp::FutureReturnCode::SUCCESS)
+        {
+          RCLCPP_INFO(nh_->get_logger(), "Called pause_servo service: %s", future.get()->message.c_str());
+        }
+        else
+        {
+          RCLCPP_ERROR(nh_->get_logger(), "Failed to call pause_servo service");
+        }
+
+        req->data = true;
+        future = sw_hw_ctrl_mode_cli_->async_send_request(req);
+
+        if (rclcpp::spin_until_future_complete(service_node_, future) == rclcpp::FutureReturnCode::SUCCESS)
+        {
+          RCLCPP_INFO(nh_->get_logger(), "Called toggle_servo_mode service: %s", future.get()->message.c_str());
+        }
+        else
+        {
+          RCLCPP_ERROR(nh_->get_logger(), "Failed to call pause_servo service");
+        }
+
+        continue;
+      }
+      else if (c == KEYCODE_Q)
+      {
+        RCLCPP_INFO(nh_->get_logger(), "quit");
+        return 0;
+      }
+      else
+      {
+        RCLCPP_WARN(nh_->get_logger(), "Input paused, press 'p' to unpause");
+        continue;
+      }
     }
 
     RCLCPP_DEBUG(nh_->get_logger(), "value: 0x%02X\n", c);

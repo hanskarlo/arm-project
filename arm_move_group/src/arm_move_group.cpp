@@ -1,9 +1,5 @@
 #include <arm_move_group/arm_move_group.h>
 
-// All source files that use ROS logging should define a file-specific
-// static const rclcpp::Logger named LOGGER, located at the top of the file
-// and inside the namespace with the narrowest scope (if there is one)
-
 ArmMoveGroup::ArmMoveGroup()
 {
 	rclcpp::NodeOptions node_options;
@@ -70,6 +66,14 @@ ArmMoveGroup::ArmMoveGroup()
 	else
 		RCLCPP_INFO(node_->get_logger(), "Not visualizing trajectories");
 
+
+	servoing_ = node_->get_parameter("servoing").as_bool();
+
+	if (servoing_)
+		RCLCPP_INFO(node_->get_logger(), "In servo mode");
+	else
+		RCLCPP_INFO(node_->get_logger(), "Not In servo mode");
+
 	RCLCPP_INFO(node_->get_logger(), "Initialized!");
 }
 
@@ -93,10 +97,12 @@ void ArmMoveGroup::joint_space_goal_cb_(
 	node_options.automatically_declare_parameters_from_overrides(true);
 	auto move_group_node = rclcpp::Node::make_shared("mgn", node_options);
 
+
 	// Add node to executor and spin in another thread
 	rclcpp::executors::SingleThreadedExecutor executor;
 	executor.add_node(move_group_node);
 	std::thread t([&executor]() { executor.spin(); });
+
 
 	// Create move group interface using move_group_node
 	auto move_group = moveit::planning_interface::MoveGroupInterface(move_group_node, PLANNING_GROUP);
@@ -727,6 +733,23 @@ void ArmMoveGroup::execute_cb_(
 {
 	// Supress compiler warning
 	const auto rq = request;
+
+
+	//* Pause servo_node if running
+	if (servoing_)
+	{
+		auto temp_node = rclcpp::Node::make_shared("mgn_temp_");
+		
+		pause_servo_input_cli_ = temp_node->create_client<Trigger>("pause_servo_input");
+	
+		auto req = std::make_shared<Trigger::Request>();
+		auto result = pause_servo_input_cli_->async_send_request(req);
+
+		if (rclcpp::spin_until_future_complete(temp_node, result) == rclcpp::FutureReturnCode::SUCCESS)
+			RCLCPP_INFO(node_->get_logger(), "Successfully paused servo input");
+		else
+			RCLCPP_WARN(node_->get_logger(), "Failed to paused servo input");
+	}
 
 
 	// Node for move group interface

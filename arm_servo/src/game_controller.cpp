@@ -94,7 +94,6 @@ GameController::GameController() :
     servo_cmd_toggle_(true),
     right_bumper_toggle_(true),
     left_bumper_toggle_(true),
-    cartesian_plane_toggle_(true),
     joint_num_(0)
 {
     // Node bridging Joy with MoveIt2 Servo

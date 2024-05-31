@@ -44,15 +44,17 @@ namespace arm_hardware
         arm_commands.name.resize(NUM_JOINTS);
         arm_commands.position.assign(NUM_JOINTS, 0.0);
 
-        // Initialize joint names
+        // Initialize drive states and adjust_pos_ flags
         for (uint i = 0; i < NUM_JOINTS; i++)
         {
             arm_commands.name[i] = info_.joints[i].name;
+            adjust_pos_[i] = false;
+            current_drive_state_[i] = STATIONARY;
         }
 
         //* Add random ID to prevent warnings about multiple publishers within the same node
         rclcpp::NodeOptions options;
-        options.arguments({ "--ros-args", "-r", "__node:=" + info_.name });
+        options.arguments({ "--ros-args", "-r", "__node:=arm_hw_node" });
 
         
         //* Make node to publish/subscribe to arm topics
@@ -69,12 +71,57 @@ namespace arm_hardware
         );
 
 
+        // Make restart subscriber
+        LOG_INFO("[on_init] Making reset start position subsciber");
+        // restart_pos_sub_ = hw_node_->create_subscription<std_msgs::msg::Bool>(
+        //     "arm/servo/reset",
+        //     rclcpp::QoS(10),
+        //     [this](const std_msgs::msg::Bool::SharedPtr msg){ (void) msg; start_pose_recv_ = false; }
+        // );
+
+
         //* Make command interface publisher
         LOG_INFO("[on_init] Making arm/commands publisher");
         joint_commands_pub_ = hw_node_->create_publisher<sensor_msgs::msg::JointState>(
             get_hw_topic_param("command_interface_topic", "arm/command"),
             rclcpp::QoS(1)
         );
+
+
+
+        sw_hw_ctrl_mode_srv_ = hw_node_->create_service<std_srvs::srv::SetBool>(
+            "arm_hw_node/toggle_servo_mode",
+            [this](
+                const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+                std::shared_ptr<std_srvs::srv::SetBool::Response> response
+            )
+            {
+                bool servo_mode = request->data;
+                if (servo_mode)
+                {
+                    if (ctrl_mode == PLAN)
+                    {
+                        response->success = true;
+                        response->message = "Testing planning mode";
+                        return;
+                    }
+
+                    ctrl_mode = SERVO;
+                    start_pose_recv_ = false;
+                    RCLCPP_INFO(hw_node_->get_logger(), "%s", response->message.c_str());
+                }
+                else
+                {
+                    ctrl_mode = PLAN;
+                    // start_pose_recv_ = false;
+                    response->success = true;
+                    response->message = "Switched to planning mode";
+                    RCLCPP_INFO(hw_node_->get_logger(), "%s", response->message.c_str());
+                }
+            }
+        );
+
+        
 
 
         const std::string ctrl_mode_param =  get_hw_topic_param("control_mode", "plan");
@@ -183,10 +230,47 @@ namespace arm_hardware
                 starting_pos_[i] = latest_arm_state_.position[i];
         
             start_pose_recv_ = true;
+
+            RCLCPP_INFO(hw_node_->get_logger(), "Reference starting pose updated!");
         }
 
 
         return hardware_interface::return_type::OK;
+    }
+
+
+    void ArmHardwareInterface::adjust_pos_command_(const uint joint_num)
+    {
+        if (latest_arm_state_.position[joint_num] < -PI)
+        {
+            uint pi_factor = 1;
+            if ( abs(latest_arm_state_.position[joint_num]) > (2*PI) )
+                pi_factor = abs((latest_arm_state_.position[joint_num] / (2*PI)));
+
+            // RCLCPP_INFO(rclcpp::get_logger(LOGGER), "Adjusting J%u pos cmd from %f with pi factor %u", i, arm_position_commands_[i], pi_factor);
+
+            arm_position_commands_[joint_num] -= (2*PI) * (pi_factor);
+
+
+            // Begin adjusting position command interface for this joint
+            adjust_pos_[joint_num] = true;
+        }
+        else if(latest_arm_state_.position[joint_num] > PI)
+        {
+            uint pi_factor = 1;
+            if ( latest_arm_state_.position[joint_num] > (2*PI) )
+                pi_factor = (latest_arm_state_.position[joint_num] / (2*PI));
+
+            arm_position_commands_[joint_num] += (2*PI) * (pi_factor);
+
+            // Begin adjusting position command interface for this joint
+            adjust_pos_[joint_num] = true;
+        }
+        else
+        {
+            // Don't adjust position command interface
+            adjust_pos_[joint_num] = false;
+        }
     }
 
 
@@ -278,8 +362,13 @@ namespace arm_hardware
         }
 
         //* Publish arm_commands to arm/command topic
-        if (rclcpp::ok()){
-            joint_commands_pub_->publish(arm_commands);
+        if (rclcpp::ok())
+        {
+            if ((ctrl_mode == SERVO && start_pose_recv_) || // Only publish servo commands once start position established
+                (ctrl_mode == PLAN))
+            {
+                joint_commands_pub_->publish(arm_commands);
+            }
         }
 
         return hardware_interface::return_type::OK;
