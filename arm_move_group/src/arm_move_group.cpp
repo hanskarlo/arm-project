@@ -73,6 +73,17 @@ ArmMoveGroup::ArmMoveGroup()
 		RCLCPP_INFO(node_->get_logger(), "In servo mode");
 	else
 		RCLCPP_INFO(node_->get_logger(), "Not In servo mode");
+	
+
+	if (servoing_)
+	{
+		execution_feedback_sub_ = node_->create_subscription<ExecutionFeedback>(
+			"/execute_trajectory/_action/feedback",
+			rclcpp::QoS(1),
+			std::bind(&ArmMoveGroup::exec_feedback_cb_, this, _1)
+		);
+	}
+
 
 	RCLCPP_INFO(node_->get_logger(), "Initialized!");
 }
@@ -82,6 +93,30 @@ ArmMoveGroup::~ArmMoveGroup()
 	RCLCPP_INFO(node_->get_logger(), "Destruct sequence initiated.");
 }
 
+
+void ArmMoveGroup::exec_feedback_cb_(const ExecutionFeedback::SharedPtr feedback)
+{
+	std::string state = feedback->feedback.state;
+	RCLCPP_INFO(node_->get_logger(), "Trajectory execution status: %s", feedback->feedback.state.c_str());
+
+	if (strcmp(state.c_str(), "IDLE") == 0)
+	{
+		// Node for pausing servo_node if needed
+		auto servo_pause_cli_node = rclcpp::Node::make_shared("pause_servo_cli_node_");
+		rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr pause_servo_cli_;
+		pause_servo_cli_ = servo_pause_cli_node->create_client<std_srvs::srv::SetBool>("servo_node/pause_servo");
+		
+		auto req = std::make_shared<std_srvs::srv::SetBool::Request>();
+		req->data = false;
+
+		auto future = pause_servo_cli_->async_send_request(req);
+
+		if (rclcpp::spin_until_future_complete(servo_pause_cli_node, future) == rclcpp::FutureReturnCode::SUCCESS)
+			RCLCPP_INFO(node_->get_logger(), "Called pause_servo service: %s", future.get()->message.c_str());
+		else
+			RCLCPP_ERROR(node_->get_logger(), "Failed to call pause_servo service");
+	}
+}
 
 
 
@@ -510,11 +545,12 @@ void ArmMoveGroup::stop_cb_(
 	// Supress compiler warning
 	const auto rq = request;
 
+	RCLCPP_INFO(node_->get_logger(), "/arm/Stop service call received\n");
 
 	// Node for move group interface
 	rclcpp::NodeOptions node_options;
 	node_options.automatically_declare_parameters_from_overrides(true);
-	auto move_group_node = rclcpp::Node::make_shared("mgn", node_options);
+	auto move_group_node = rclcpp::Node::make_shared("mg_stop_node", node_options);
 
 	// Add node to executor and spin in another thread
 	rclcpp::executors::SingleThreadedExecutor executor;
@@ -524,7 +560,6 @@ void ArmMoveGroup::stop_cb_(
 	// Create move group interface using move_group_node
 	auto move_group = moveit::planning_interface::MoveGroupInterface(move_group_node, PLANNING_GROUP);
 	// auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
-
 
 	try
 	{
@@ -540,7 +575,9 @@ void ArmMoveGroup::stop_cb_(
 		response->success = false;
 	}
 
-	
+	// Stop executor spin and join thread
+	executor.cancel();
+	t.join();
 }
 
 
@@ -732,23 +769,26 @@ void ArmMoveGroup::execute_cb_(
 	std::shared_ptr<Trigger::Response> response)
 {
 	// Supress compiler warning
-	const auto rq = request;
+	(void) request;
 
-
-	//* Pause servo_node if running
+	// Pause servo_node if running
 	if (servoing_)
 	{
-		auto temp_node = rclcpp::Node::make_shared("mgn_temp_");
+		// Node for pausing servo_node if needed
+		auto servo_pause_cli_node = rclcpp::Node::make_shared("pause_servo_cli_node_");
 		
-		pause_servo_input_cli_ = temp_node->create_client<Trigger>("pause_servo_input");
-	
-		auto req = std::make_shared<Trigger::Request>();
-		auto result = pause_servo_input_cli_->async_send_request(req);
+		rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr pause_servo_cli_;
+		pause_servo_cli_ = servo_pause_cli_node->create_client<std_srvs::srv::SetBool>("servo_node/pause_servo");
+		
+		auto req = std::make_shared<std_srvs::srv::SetBool::Request>();
+		req->data = true;
 
-		if (rclcpp::spin_until_future_complete(temp_node, result) == rclcpp::FutureReturnCode::SUCCESS)
-			RCLCPP_INFO(node_->get_logger(), "Successfully paused servo input");
+		auto future = pause_servo_cli_->async_send_request(req);
+
+		if (rclcpp::spin_until_future_complete(servo_pause_cli_node, future) == rclcpp::FutureReturnCode::SUCCESS)
+			RCLCPP_INFO(node_->get_logger(), "Called pause_servo service: %s", future.get()->message.c_str());
 		else
-			RCLCPP_WARN(node_->get_logger(), "Failed to paused servo input");
+			RCLCPP_ERROR(node_->get_logger(), "Failed to call pause_servo service");
 	}
 
 
@@ -804,7 +844,6 @@ void ArmMoveGroup::execute_cb_(
 			response->success = false;
 		}
 	}
-
 
 	// Stop executor spin and join thread
 	executor.cancel();
@@ -945,7 +984,9 @@ void ArmMoveGroup::execute_saved_cb_(
 }
 
 
-void ArmMoveGroup::get_state_cb_(const std::shared_ptr<GetState::Request> request, std::shared_ptr<GetState::Response> response)
+void ArmMoveGroup::get_state_cb_(
+	const std::shared_ptr<GetState::Request> request, 
+	std::shared_ptr<GetState::Response> response)
 {
 	// Suppress compiler warning
 	(void) request;
@@ -995,6 +1036,7 @@ void ArmMoveGroup::get_state_cb_(const std::shared_ptr<GetState::Request> reques
 	executor.cancel();
 	t.join();
 }
+
 
 
 

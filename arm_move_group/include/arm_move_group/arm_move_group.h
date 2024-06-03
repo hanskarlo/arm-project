@@ -23,17 +23,15 @@
 #include <moveit_msgs/msg/collision_object.hpp>
 
 #include <std_srvs/srv/trigger.hpp>
-
+#include <std_srvs/srv/set_bool.hpp>
 #include "arm_msgs/srv/joint_space_goal.hpp"
 #include "arm_msgs/srv/pose_goal.hpp"
 #include "arm_msgs/srv/pose_goal_array.hpp"
-
 #include "arm_msgs/srv/save.hpp"
 #include "arm_msgs/srv/move_to_saved.hpp"
-
 #include "arm_msgs/srv/get_state.hpp"
 
-
+#include <moveit_msgs/action/execute_trajectory.hpp>
 
 
 using namespace std::chrono_literals;
@@ -59,9 +57,11 @@ class ArmMoveGroup
         const std::string POSE_DIR = PKG_DIR + "poses/";
         const std::string TRAJ_DIR = PKG_DIR + "trajectories/";
 
+        //* ROS2 Parameters
         bool visualize_trajectories_ = true;
         bool servoing_ = false;
 
+        bool in_execution_ = false;
         bool joint_space_goal_recv_ = false;
         bool pose_goal_recv_ = false;
         bool linear_trajectory_recv_ = false;
@@ -69,12 +69,16 @@ class ArmMoveGroup
 
 
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr collision_obj_sub_;
-        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_clear_sub_;      
+        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_clear_sub_; 
+
+        using ExecutionFeedback = moveit_msgs::action::ExecuteTrajectory_FeedbackMessage;
+        rclcpp::Subscription<ExecutionFeedback>::SharedPtr execution_feedback_sub_;
+
 
         moveit_msgs::msg::RobotTrajectory trajectory_;
 
         void clear_cb_(const std_msgs::msg::Bool::SharedPtr clear_msg);
-
+        void exec_feedback_cb_(const ExecutionFeedback::SharedPtr feedback);
 
         // Feature-set services
         using JointSpaceGoal = arm_msgs::srv::JointSpaceGoal;
@@ -87,17 +91,15 @@ class ArmMoveGroup
 
         rclcpp::Service<Trigger>::SharedPtr execute_srv_;
         rclcpp::Service<Trigger>::SharedPtr stop_srv_;
-
         rclcpp::Service<JointSpaceGoal>::SharedPtr joint_space_goal_srv_;
         rclcpp::Service<PoseGoal>::SharedPtr pose_goal_srv_;
         rclcpp::Service<PoseGoalArray>::SharedPtr pose_goal_array_srv_;
-
         rclcpp::Service<Save>::SharedPtr save_srv_;
         rclcpp::Service<MoveToSaved>::SharedPtr move_to_saved_srv_;  
-
         rclcpp::Service<GetState>::SharedPtr get_state_srv_;
 
         rclcpp::Client<Trigger>::SharedPtr pause_servo_input_cli_;
+
 
         // Service callbacks
         void save_cb_(const std::shared_ptr<Save::Request> request, std::shared_ptr<Save::Response> response);
