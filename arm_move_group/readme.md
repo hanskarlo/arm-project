@@ -1,6 +1,9 @@
 # Arm Move Group Interface
 - [Arm Move Group Interface](#arm-move-group-interface)
   - [Description](#description)
+  - [Launch](#launch)
+    - [Parameters](#parameters)
+    - [Example](#example)
   - [Features](#features)
     - [Generate motion plan to joint space goal `arm/JointSpaceGoal`](#generate-motion-plan-to-joint-space-goal-armjointspacegoal)
     - [Generate motion plan to pose goal `arm/PoseGoal`](#generate-motion-plan-to-pose-goal-armposegoal)
@@ -18,6 +21,26 @@ This package hosts the node that utilizes the Move Group C++ Interface to genera
 
 The custom service interface is outlined in the **arm_msgs** package. Example service calls can be found in the **arm_tests** package.
 
+## Launch
+
+### Parameters
+`visualize_trajectories` Boolean parameter to trace end effector trajectory path of motion plan. 
+
+> :exclamation: Will need a Marker Array module in RVIZ2 subscribed to `/arm_marker_array`, otherwise code will be blocked.
+
+<br>
+
+`servoing` Boolean parameter denoting if arm in servo mode.
+
+
+### Example
+To launch the arm move group interface:
+```bash
+ros2 launch arm_move_group move.group.launch.py visualize_trajectories:=false servoing:=false
+```
+
+<br>
+
 
 ## Features
 ### Generate motion plan to joint space goal `arm/JointSpaceGoal`
@@ -32,7 +55,8 @@ The following command generates a motion plan at **10% of max speed** to joint a
 ```bash
 ros2 service call /arm/JointSpaceGoal arm_msgs/srv/JointSpaceGoal '{speed: 10, joint_pos_deg: [10, 45, 0, 0, 60, 90]}'
 ```
-
+<br>
+<br>
 
 ### Generate motion plan to pose goal `arm/PoseGoal`
 
@@ -83,7 +107,7 @@ The following command generates a linear motion plan with the following waypoint
   - z: $0.3$m
 
 ```bash
-ros2 service call /arm/PoseGoalArray arm_msgs/srv/PoseTargetArray '{type: 'linear', step_size: 0.01, jump_threshold: 0.0, waypoints: {pose: {position: {x: 0.2, y: 0.0, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}, pose: {position: {x: 0.2, y: 0.4, z: 0.3}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}}'
+ros2 service call /arm/PoseGoalArray arm_msgs/srv/PoseGoalArray '{type: 'linear', step_size: 0.01, jump_threshold: 0.0, waypoints: [{position: {x: 0.2, y: 0.0, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}, {position: {x: 0.2, y: 0.4, z: 0.3}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}]}'
 ```
 
 <br>
@@ -105,7 +129,7 @@ The following command generates a curved motion plan creating a quarter-circle a
 <br>
 
 ```bash
-ros2 service call /arm/PoseGoalArray arm_msgs/srv/PoseTargetArray '{type: 'linear', step_size: 0.01, jump_threshold: 0.0, waypoints: {pose: {position: {x: 0.01, y: 0.0, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}, pose: {position: {x: 0.01, y: 0.0, z: 0.01}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}}'
+ros2 service call /arm/PoseGoalArray arm_msgs/srv/PoseGoalArray '{type: 'arc', step_size: 0.01, jump_threshold: 0.0, waypoints: [{position: {x: 0.01, y: 0.0, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}},{position: {x: 0.01, y: 0.0, z: 0.01}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}]}'
 ```
 
 <br>

@@ -7,6 +7,7 @@ The software was tested on an ASUS PN50 with
 - Ryzen 5 4500U, 16GB Ram
 - Realtek Semiconductor RTL8111/8168/8411 Gigabit Ethernet Controller
 - Linux kernel 6.6.18 with PREEMPT_RT patch (6.6.18-rt23)
+
 <br>
 
 ## Built with
@@ -14,10 +15,11 @@ The software was tested on an ASUS PN50 with
 [<img src="https://images.squarespace-cdn.com/content/v1/606d378755a86f589aa297b7/1653397531343-6M4IQ4JWDQV1SQ8W17UN/HumbleHawksbill_TransparentBG-NoROS.png" alt="MoveIt Logo" width="200"/>](https://docs.ros.org/en/humble/index.html)
 [<img src="https://automaticaddison.com/wp-content/uploads/2023/10/ros2-iron.png" alt="MoveIt Logo" width="240"/>](https://docs.ros.org/en/iron/Releases/Release-Iron-Irwini.html)
 
-[<img src="https://moveit.picknik.ai/main/_static/rolling-small.png" alt="MoveIt Logo" width="200"/>](https://github.com/ros-planning/moveit2)
+[<img src="https://moveit.ros.org/assets/logo/moveit_logo-black.png" alt="MoveIt Logo" width="200"/>](https://github.com/ros-planning/moveit2)
 
 [![EtherCat](https://gitlab.com/uploads/-/system/project/avatar/24894054/master-128.png?width=200)](https://gitlab.com/etherlab.org/ethercat)
 
+<br>
 
 ## Getting started
 
@@ -28,21 +30,61 @@ The software was tested on an ASUS PN50 with
 * ROS2 Humble Hawksbill or ROS2 Iron Irwini
 * MoveIt2 Humble or MoveIt2 Iron
 * IgH EtherCAT Master for Linux
+* cereal - A C++11 library for serialization
+
+<br>
 
 ### Installation
+
+#### Dependencies
+
+To install the **ros2_control** software necessary for the hardware interface and controllers:
+```bash
+sudo apt install ros-<your ros distro>-ros2-control
+sudo apt install ros-<your ros distro>-ros2-controllers
+```
+
+<br>
+
+[**cereal**](https://uscilab.github.io/cereal/quickstart.html) is used for storing poses and trajectories by way of serialization and is used by the **arm_move_group** package.
+
+Download **cereal** and place `cereal-1.3.2/include/cereal` into a folder where the project can find it. You can place it in `/usr/include/` (Recommended).
+> :warning: Make sure to get cereal version **1.3.2**.
+ 
+```bash
+sudo cp -r ~/Downloads/cereal-1.3.2/include/cereal /usr/include/
+```
+
+<br>
+
+If MoveIt2 software was compiled and built using the source code, skip to the [Build order](#build-order) section.
+Otherwise, if MoveIt2 was installed via binary installation, the following packages will need to be installed:
+```bash
+source /opt/ros/<your ros distro>/setup.bash
+sudo apt install ros-$ROS_DISTRO-moveit-servo
+sudo apt install ros-$ROS_DISTRO-moveit-planners-chomp
+sudo apt install ros-$ROS_DISTRO-moveit-visual-tools
+sudo apt install ros-$ROS_DISTRO-pick-ik
+```
+
+<br>
+
+The IgH EtherLab EtherCAT Master software installation is only required if interfacing with the ZeroErr arm hardware. Refer to the [documentation](https://docs.etherlab.org/ethercat/1.5/pdf/ethercat_doc.pdf#chapter.9) on how to install it.
+
+
+<br>
+<br>
+
+### Build order
+
 Clone the repository **into your MoveIt2 workspace /src folder** 
 ```bash
 cd /your_moveit2_ws/src
 git clone https:/github.com/hanskarlo/arm-project.git
 ```
 
-<br>
-
-#### Build order
-
 Source your workspace and build the packages
 ```bash
-cd /your_moveit2_ws
 source install/setup.bash
 ```
 
@@ -92,33 +134,110 @@ colcon build --packages-select arm_move_group arm_servo arm_tests
 <br>
 
 ## Usage
-Start the EtherCAT Master module:
+
+If using **real hardware**, start the EtherCAT Master module:
 ```bash
 sudo /etc/init.d/ethercat start
 ```
 
 <br>
 
-Run the arm_ethercat_interface node:
+### Motion Planning
+
+Launch the arm configuration: 
 ```bash
-ros2 run arm_ethercat_interface arm_ethercat_interface
-```
+# Simulated hardware
+ros2 launch arm_config sim.launch.py
 
-> :exclamation: The node may take some time to configure the actuators to the EtherCAT OP state (see [Known Issues](#known-issues)) 
-
-<br>
-
-Once all actuators have reached the **Operation enabled** state (CiA402 FSA), launch the MoveIt2 config: 
-```bash
+# Real hardware
 ros2 launch arm_config hardware.launch.py
 ```
 
 <br>
 
-## ToDo
-- Explore different EtherCAT syncing techniques with the eRob actuators (i.e. DC Synchronization).
-  - Consider placing EtherCAT interface software directly in ros2_control hardware interface
+Run the `arm_move_group` interface (see the [readme](../zeroerr_arm/arm_move_group/README.md)) with 
+- `visualize_trajectories`: false, 
+- `servoing`: false.
 
+<br>
+
+If using **real hardware**, run the EtherCAT interface:
+```bash
+ros2 run arm_ethercat_interface arm_ethercat_interface
+```
+
+Wait until all joints are in Operation enabled state before attempting any motion plans.
+
+> :bulb: In another terminal, run `ethercat slaves` to query the slave states, or watch the terminal.
+
+> :exclamation: The node may take some time to configure the actuators to the EtherCAT OP state (see [Known Issues](#known-issues)) 
+
+<br>
+
+
+
+### Servoing
+
+Launch the servo configuration:
+```bash
+# Simulation
+ros2 launch arm_config servo.launch.py
+
+# Real hardware
+ros2 launch arm_config servo.launch.py hardware_type:=real
+```
+
+<br>
+
+If motion plans are also desired, run the `arm_move_group` interface with
+- `visualize_trajectories` false, 
+- `servoing` true (see the [readme](../arm_project/arm_move_group/README.md)).
+
+<br>
+
+If using real hardware, run the EtherCAT interface:
+```bash
+ros2 run arm_ethercat_interface arm_ethercat_interface
+```
+
+Wait until all joints are in OP state before attempting any motion plans.
+
+> :bulb: In another terminal, run `ethercat slaves` to query the slave states, or watch the terminal.
+
+> :exclamation: The node may take some time to configure the actuators to the EtherCAT OP state (see [Known Issues](#known-issues)) 
+
+<br>
+
+#### Keyboard control servoing
+For keyboard servoing, run the `servo_keyboard_control` node from the `arm_servo` package:
+```bash
+ros2 run arm_servo servo_keyboard_control
+```
+
+<br>
+
+#### Game controller servoing
+The ROS2 **Joy** package is used for servoing the arm via game controllers. 
+
+Run the `Joy` package `game_controller_node`:
+```bash
+ros2 run joy game_controller_node
+```
+
+Connect a controller to the machine via Bluetooth, or USB. The connected controller should appear in the terminal output.
+
+<br>
+
+Run the 'arm_servo' package `game_controller` node:
+```bash
+ros2 run arm_servo game_controller
+```
+
+See the game controller servo control layout [here](../arm-project/arm_servo/Control_Layout.md).
+
+
+
+<br>
 
 ## Known issues
 * The arm_ethercat_interface node experiences turbulance when initially configuring the EtherCAT slaves (eRob actuators). This stems from a myriad of possible issues (hardware, communication frequency, control frequency).
