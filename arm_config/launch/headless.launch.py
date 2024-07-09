@@ -2,6 +2,7 @@ import os
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch_param_builder import ParameterBuilder
 from launch.conditions import IfCondition
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -28,14 +29,14 @@ def generate_launch_description():
         description="Control mode of arm -- possible values: [plan, servo]",
     )
 
+
     moveit_config = (
         MoveItConfigsBuilder("ArmProject", package_name="arm_config")
         .robot_description(
             file_path="config/zeroerr_arm.urdf.xacro",
             mappings={
                 "ros2_control_hardware_type": LaunchConfiguration("hardware_type"),
-                "control_mode": LaunchConfiguration("control_mode")
-            },
+                "control_mode": LaunchConfiguration("control_mode")},
         )
         .robot_description_semantic(file_path="config/zeroerr_arm.srdf")
         .planning_scene_monitor(
@@ -53,6 +54,7 @@ def generate_launch_description():
         )
         .to_moveit_configs()
     )
+
 
     # Start the actual move_group node/action server
     move_group_node = Node(
@@ -79,35 +81,20 @@ def generate_launch_description():
         "moveit.rviz"
     )
 
-    rviz_node = Node(
-        package="rviz2",
-        executable="rviz2",
-        name="rviz2",
-        output="log",
-        arguments=["-d", rviz_config],
-        parameters=[
-            moveit_config.robot_description,
-            moveit_config.robot_description_semantic,
-            moveit_config.planning_pipelines,
-            moveit_config.robot_description_kinematics,
-            moveit_config.joint_limits,
-        ],
-    )
-
     # Static TF
     static_tf_node = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
         name="static_transform_publisher",
         output="log",
-        arguments=["0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "world", "arm_Link"],
+        arguments=["1.0", "1.0", "1.0", "0.0", "0.0", "0.0", "odom", "arm_Link"],
     )
 
     # Publish TF
     robot_state_publisher = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
-        name="robot_state_publisher",
+        name="arm_state_publisher",
         output="both",
         remappings=[
             ('/robot_description', '/arm/robot_description')
@@ -128,32 +115,69 @@ def generate_launch_description():
         output="screen",
     )
 
+    domain_bridge_node = Node(
+        package="domain_bridge",
+        executable="domain_bridge",
+        arguments=[
+            "/home/aroarm0/arm_iron_ws/src/zeroerr_arm/arm_config/config/arm_bridge.yaml"
+        ]
+    )
+
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
         executable="spawner",
         arguments=[
             "joint_state_broadcaster",
-            "--controller-manager",
-            "/controller_manager",
+            "-c", "/controller_manager",
         ],
     )
 
     arm_group_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["arm_group_controller", "-c", "/controller_manager"],
+        arguments=["arm_group_controller", 
+                   "-c", "/controller_manager"],
     )
+
+    arm_move_group = Node(
+        package="arm_move_group",
+        executable="arm_move_group",
+        output="screen",
+        parameters=[
+            moveit_config.robot_description,
+            moveit_config.robot_description_semantic,
+            moveit_config.robot_description_kinematics,
+            {"use_sim_time": True}, #! Will not receive joint_states if False
+            {"visualize_trajectory": False},
+            {"servoing": False}
+        ],
+        
+    )
+
+    add_robot_scene = Node(
+        package="arm_move_group",
+        executable="add_robot_scene.py",
+    )
+
+    robot_server = Node(
+        package="arm_move_group",
+        executable="robot_server.py"
+    )
+
     
     return LaunchDescription(
         [
             ros2_control_hardware_type,
             control_mode,
-            rviz_node,
             static_tf_node,
             robot_state_publisher,
             move_group_node,
             ros2_control_node,
             joint_state_broadcaster_spawner,
             arm_group_spawner,
+            domain_bridge_node,
+            arm_move_group,
+            add_robot_scene,
+            robot_server,
         ]
     )

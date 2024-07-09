@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="ArmProject">
-    <xacro:arg name="ros2_control_hardware_type" default="mock_components" />
+    <xacro:arg name="ros2_control_hardware_type" default="sim" />
 
     <!-- Import zeroerr_arm urdf file -->
     <xacro:include filename="$(find arm_description)/urdf/zeroerr.urdf" />
