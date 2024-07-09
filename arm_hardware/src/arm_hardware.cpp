@@ -44,12 +44,10 @@ namespace arm_hardware
         arm_commands.name.resize(NUM_JOINTS);
         arm_commands.position.assign(NUM_JOINTS, 0.0);
 
-        // Initialize drive states and adjust_pos_ flags
+        // Initialize arm command array with joint names from urdf
         for (uint i = 0; i < NUM_JOINTS; i++)
         {
             arm_commands.name[i] = info_.joints[i].name;
-            adjust_pos_[i] = false;
-            current_drive_state_[i] = STATIONARY;
         }
 
         //* Add random ID to prevent warnings about multiple publishers within the same node
@@ -99,12 +97,12 @@ namespace arm_hardware
                 bool servo_mode = request->data;
                 if (servo_mode)
                 {
-                    if (ctrl_mode == PLAN)
-                    {
-                        response->success = true;
-                        response->message = "Testing planning mode";
-                        return;
-                    }
+                    // if (ctrl_mode == PLAN)
+                    // {
+                    //     response->success = true;
+                    //     response->message = "Testing planning mode";
+                    //     return;
+                    // }
 
                     ctrl_mode = SERVO;
                     start_pose_recv_ = false;
@@ -113,7 +111,9 @@ namespace arm_hardware
                 else
                 {
                     ctrl_mode = PLAN;
-                    // start_pose_recv_ = false;
+                    start_pose_recv_ = false;
+                    // servo_init_ = false;
+
                     response->success = true;
                     response->message = "Switched to planning mode";
                     RCLCPP_INFO(hw_node_->get_logger(), "%s", response->message.c_str());
@@ -132,6 +132,47 @@ namespace arm_hardware
         {
             // LOG_INFO("Servo mode");
             ctrl_mode = SERVO;
+
+            servo_paused_ = true;
+            servo_init_ = true;
+
+            pause_servo_cli_ = hw_node_->create_client<std_srvs::srv::SetBool>("servo_node/pause_servo");
+
+            // using namespace std::chrono_literals;
+            // auto func = [&, this](){
+            //         while (!pause_servo_cli_->wait_for_service(1s))
+            //         {
+            //             if (!rclcpp::ok())
+            //             {
+            //                 LOG_ERR("[on_init] Interrupted while waiting for pause_service!");
+            //                 return CallbackReturn::ERROR;
+            //             }
+
+            //             LOG_INFO("[on_init] Waiting for pause_servo service...");
+            //         }    
+
+            //         auto req = std::make_shared<std_srvs::srv::SetBool::Request>();
+            //         req->data = true;
+
+            //         auto future = pause_servo_cli_->async_send_request(req);
+
+            //         if (rclcpp::spin_until_future_complete(hw_node_, future) == rclcpp::FutureReturnCode::SUCCESS)
+            //         {
+            //             RCLCPP_INFO(hw_node_->get_logger(), "pause_servo service call response: %s", future.get()->message.c_str());
+            //             servo_paused_ = true;
+            //             servo_init_ = true;
+            //         }
+            //         else
+            //         {
+            //             LOG_ERR("[on_init] Failed to pause servo_node!");
+            //         }
+            //     };
+
+            // on_init needs to finish execution; pause servo node in different thread
+            // std::thread{func}.detach();
+
+
+
         }
         else if (strcmp(ctrl_mode_param.c_str(), "plan") == 0)
         {
@@ -229,48 +270,31 @@ namespace arm_hardware
             for (uint i = 0; i < NUM_JOINTS; i++)
                 starting_pos_[i] = latest_arm_state_.position[i];
         
+
+            // Signal start pose received
             start_pose_recv_ = true;
+
+
+            // Resume servo_node
+            auto req = std::make_shared<std_srvs::srv::SetBool::Request>();
+            req->data = false;
+
+            auto future = pause_servo_cli_->async_send_request(req);
+
+            if (rclcpp::spin_until_future_complete(hw_node_, future) == rclcpp::FutureReturnCode::SUCCESS)
+            {
+                RCLCPP_INFO(hw_node_->get_logger(), "pause_servo service call response: %s", future.get()->message.c_str());
+            }
+            else
+            {
+                LOG_ERR("[on_init] Failed to pause servo_node!");
+            }
 
             RCLCPP_INFO(hw_node_->get_logger(), "Reference starting pose updated!");
         }
 
 
         return hardware_interface::return_type::OK;
-    }
-
-
-    void ArmHardwareInterface::adjust_pos_command_(const uint joint_num)
-    {
-        if (latest_arm_state_.position[joint_num] < -PI)
-        {
-            uint pi_factor = 1;
-            if ( abs(latest_arm_state_.position[joint_num]) > (2*PI) )
-                pi_factor = abs((latest_arm_state_.position[joint_num] / (2*PI)));
-
-            // RCLCPP_INFO(rclcpp::get_logger(LOGGER), "Adjusting J%u pos cmd from %f with pi factor %u", i, arm_position_commands_[i], pi_factor);
-
-            arm_position_commands_[joint_num] -= (2*PI) * (pi_factor);
-
-
-            // Begin adjusting position command interface for this joint
-            adjust_pos_[joint_num] = true;
-        }
-        else if(latest_arm_state_.position[joint_num] > PI)
-        {
-            uint pi_factor = 1;
-            if ( latest_arm_state_.position[joint_num] > (2*PI) )
-                pi_factor = (latest_arm_state_.position[joint_num] / (2*PI));
-
-            arm_position_commands_[joint_num] += (2*PI) * (pi_factor);
-
-            // Begin adjusting position command interface for this joint
-            adjust_pos_[joint_num] = true;
-        }
-        else
-        {
-            // Don't adjust position command interface
-            adjust_pos_[joint_num] = false;
-        }
     }
 
 
@@ -328,7 +352,10 @@ namespace arm_hardware
             else
                 return hardware_interface::return_type::OK;
         }
-
+        else if ((ctrl_mode == SERVO) && !(start_pose_recv_ && servo_init_))
+        {
+            return hardware_interface::return_type::OK;
+        }
 
         // RCLCPP_INFO(rclcpp::get_logger(LOGGER), "arm_position_commands_: [%f, %f, %f, %f, %f, %f]", 
         //                                                             arm_position_commands_[0],
@@ -348,15 +375,16 @@ namespace arm_hardware
         //* Fill arm_commands with updated arm_position_commands from command interface
         for (uint i = 0; i < NUM_JOINTS; i++)
         {
-            if (ctrl_mode == PLAN)
+            if (arm_position_commands_[i] == 0.0)
+            {
+                if ((ctrl_mode == SERVO) && start_pose_recv_)
+                    arm_commands.position[i] = starting_pos_[i];
+                else
+                    return hardware_interface::return_type::OK;
+            }
+            else
             {
                 arm_commands.position[i] = arm_position_commands_[i];
-            }
-            else if (ctrl_mode == SERVO)
-            {
-                // Use starting position as reference 
-                // arm_position_commands start from 0 when servoing
-                arm_commands.position[i] = starting_pos_[i] + arm_position_commands_[i];
             }
 
         }

@@ -120,8 +120,6 @@ namespace arm_hardware
                     return default_value; // return default_value as topic
             }
 
-            void adjust_pos_command_(const uint joint_num);
-
             // Hardware interface node
             rclcpp::Node::SharedPtr hw_node_;
 
@@ -129,6 +127,8 @@ namespace arm_hardware
             rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr restart_pos_sub_;
             rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_commands_pub_;
             rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr sw_hw_ctrl_mode_srv_;
+            rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr pause_servo_cli_;
+
 
             sensor_msgs::msg::JointState latest_arm_state_;
 
@@ -154,6 +154,9 @@ namespace arm_hardware
             
             /// Flag indicating start pose was stored
             bool start_pose_recv_ = false;
+
+            bool servo_paused_ = false;
+            bool servo_init_ = false;
 
             /**
              * @brief Indicates if in motion planning or manual servo mode(s)
