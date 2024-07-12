@@ -58,30 +58,69 @@ ArmMoveGroup::ArmMoveGroup()
 	);
 
 
-	// mg_node_->declare_parameter("visualize_trajectory", true);
+	// Read launch parameters
 	visualize_trajectories_ = node_->get_parameter("visualize_trajectory").as_bool();
-
-	if (visualize_trajectories_)
-		RCLCPP_INFO(node_->get_logger(), "Visualizing trajectories");
-	else
-		RCLCPP_INFO(node_->get_logger(), "Not visualizing trajectories");
-
-
 	servoing_ = node_->get_parameter("servoing").as_bool();
 
-	if (servoing_)
-		RCLCPP_INFO(node_->get_logger(), "In servo mode");
+	if (visualize_trajectories_)
+		RCLCPP_INFO(node_->get_logger(), "Visualizing trajectories.");
 	else
-		RCLCPP_INFO(node_->get_logger(), "Not In servo mode");
-	
+		RCLCPP_INFO(node_->get_logger(), "Not visualizing trajectories.");
 
 	if (servoing_)
 	{
+		RCLCPP_INFO(node_->get_logger(), "In servo mode.\n");
 		execution_feedback_sub_ = node_->create_subscription<ExecutionFeedback>(
 			"/execute_trajectory/_action/feedback",
 			rclcpp::QoS(1),
 			std::bind(&ArmMoveGroup::exec_feedback_cb_, this, _1)
 		);
+	}
+	else
+		RCLCPP_INFO(node_->get_logger(), "Not in servo mode.\n");
+	
+
+
+	// Check if pose and trajectory save folders exist -- make them if not
+	RCLCPP_INFO(node_->get_logger(), "Checking for save directories in %s...", PKG_DIR.c_str());
+	struct stat buffer;
+
+	// Check trajectory save path
+	if (stat(TRAJ_DIR.c_str(), &buffer) == 0)
+	{
+		RCLCPP_INFO(node_->get_logger(), "Trajectory save path exists!");
+	}
+	else
+	{
+		RCLCPP_WARN(node_->get_logger(), "Creating trajectory save path at %s", TRAJ_DIR.c_str());
+	
+		if (rcpputils::fs::create_directories(TRAJ_DIR))
+		{
+			RCLCPP_INFO(node_->get_logger(), "Trajectory save path created!");
+		}
+		else
+		{
+			RCLCPP_ERROR(node_->get_logger(), "Trajectory save path creation failed!");
+		}
+	}
+
+	// Check pose save path
+	if (stat(POSE_DIR.c_str(), &buffer) == 0)
+	{
+		RCLCPP_INFO(node_->get_logger(), "Pose save path exists!");
+	}
+	else
+	{
+		RCLCPP_WARN(node_->get_logger(), "Creating Pose save path at %s", POSE_DIR.c_str());
+	
+		if (rcpputils::fs::create_directories(POSE_DIR))
+		{
+			RCLCPP_INFO(node_->get_logger(), "Pose save path created!");
+		}
+		else
+		{
+			RCLCPP_ERROR(node_->get_logger(), "Pose save path creation failed!");
+		}
 	}
 
 
@@ -99,22 +138,39 @@ void ArmMoveGroup::exec_feedback_cb_(const ExecutionFeedback::SharedPtr feedback
 	std::string state = feedback->feedback.state;
 	RCLCPP_INFO(node_->get_logger(), "Trajectory execution status: %s", feedback->feedback.state.c_str());
 
-	if (strcmp(state.c_str(), "IDLE") == 0)
+	if (servoing_)
 	{
-		// Node for pausing servo_node if needed
-		auto servo_pause_cli_node = rclcpp::Node::make_shared("pause_servo_cli_node_");
-		rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr pause_servo_cli_;
-		pause_servo_cli_ = servo_pause_cli_node->create_client<std_srvs::srv::SetBool>("servo_node/pause_servo");
-		
-		auto req = std::make_shared<std_srvs::srv::SetBool::Request>();
-		req->data = false;
+		if (strcmp(state.c_str(), "IDLE") == 0)
+		{
+			// Node for pausing servo_node if needed
 
-		auto future = pause_servo_cli_->async_send_request(req);
+			auto servo_pause_cli_node = rclcpp::Node::make_shared("pause_servo_cli_node_");
+			
+			rclcpp::Client<SetBool>::SharedPtr pause_servo_cli;
+			rclcpp::Client<SetBool>::SharedPtr sw_hw_ctrl_mode_cli;
+			pause_servo_cli = servo_pause_cli_node->create_client<SetBool>("servo_node/pause_servo");
+			sw_hw_ctrl_mode_cli = servo_pause_cli_node->create_client<SetBool>("arm_hw_node/toggle_servo_mode");
 
-		if (rclcpp::spin_until_future_complete(servo_pause_cli_node, future) == rclcpp::FutureReturnCode::SUCCESS)
-			RCLCPP_INFO(node_->get_logger(), "Called pause_servo service: %s", future.get()->message.c_str());
-		else
-			RCLCPP_ERROR(node_->get_logger(), "Failed to call pause_servo service");
+			auto req = std::make_shared<SetBool::Request>();
+			req->data = false;
+
+			auto future = pause_servo_cli->async_send_request(req);
+
+			if (rclcpp::spin_until_future_complete(servo_pause_cli_node, future) == rclcpp::FutureReturnCode::SUCCESS)
+				RCLCPP_INFO(node_->get_logger(), "Called pause_servo service: %s", future.get()->message.c_str());
+			else
+				RCLCPP_ERROR(node_->get_logger(), "Failed to call pause_servo service");
+
+			req->data = true;
+			future = sw_hw_ctrl_mode_cli->async_send_request(req);
+			if (rclcpp::spin_until_future_complete(servo_pause_cli_node, future) == rclcpp::FutureReturnCode::SUCCESS)
+				RCLCPP_INFO(node_->get_logger(), "Called arm_hw_node/toggle_servo_mode service: %s", future.get()->message.c_str());
+			else
+				RCLCPP_ERROR(node_->get_logger(), "Failed to call arm_hw_node/toggle_servo_mode service");
+
+			toggled_servo_mode_ = true;
+
+		}
 	}
 }
 
@@ -132,12 +188,10 @@ void ArmMoveGroup::joint_space_goal_cb_(
 	node_options.automatically_declare_parameters_from_overrides(true);
 	auto move_group_node = rclcpp::Node::make_shared("mgn", node_options);
 
-
 	// Add node to executor and spin in another thread
 	rclcpp::executors::SingleThreadedExecutor executor;
 	executor.add_node(move_group_node);
 	std::thread t([&executor]() { executor.spin(); });
-
 
 	// Create move group interface using move_group_node
 	auto move_group = moveit::planning_interface::MoveGroupInterface(move_group_node, PLANNING_GROUP);
@@ -254,7 +308,6 @@ void ArmMoveGroup::pose_goal_cb_(
 	// Create move group interface using move_group_node
 	auto move_group = moveit::planning_interface::MoveGroupInterface(move_group_node, PLANNING_GROUP);
 	// auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
-
 
 	// Use STOMP
 	move_group.setPlanningPipelineId("stomp");
@@ -632,34 +685,54 @@ void ArmMoveGroup::save_cb_(
 	RCLCPP_INFO(node_->get_logger(), "Received save %s request.", type.c_str());
 
 
+	// Node for move group interface
+	rclcpp::NodeOptions node_options;
+	node_options.automatically_declare_parameters_from_overrides(true);
+	auto move_group_node = rclcpp::Node::make_shared("mgn", node_options);
+
+	// Add node to executor and spin in another thread
+	rclcpp::executors::SingleThreadedExecutor executor;
+	executor.add_node(move_group_node);
+	std::thread t([&executor]() { executor.spin(); });
+
+	// Create move group interface using move_group_node
+	auto move_group = moveit::planning_interface::MoveGroupInterface(move_group_node, PLANNING_GROUP);
+	// auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+	
+	// Start monitoring state of arm
+	move_group.startStateMonitor(2.0);
+
+	// Get current state
+	moveit::core::RobotStatePtr current_state = move_group.getCurrentState();
+	
+	std::vector<double> current_joint_positions;
+	const moveit::core::JointModelGroup* joint_model_group =
+		move_group.getCurrentState()->getJointModelGroup(PLANNING_GROUP);
+
+	current_state->copyJointGroupPositions(joint_model_group, current_joint_positions);
+
+
+
 	if (!strcmp(type.c_str(), "pose"))
 	{
-		// Node for move group interface
-		rclcpp::NodeOptions node_options;
-		node_options.automatically_declare_parameters_from_overrides(true);
-		auto move_group_node = rclcpp::Node::make_shared("mgn", node_options);
-
-		// Add node to executor and spin in another thread
-		rclcpp::executors::SingleThreadedExecutor executor;
-		executor.add_node(move_group_node);
-		std::thread t([&executor]() { executor.spin(); });
-
-		// Create move group interface using move_group_node
-		auto move_group = moveit::planning_interface::MoveGroupInterface(move_group_node, PLANNING_GROUP);
-		// auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+		// Check if pose with label already exists
+		std::string file_name = POSE_DIR;
+		file_name.append(label);
+		file_name.append(".pose.json");
 		
-		
-		// Start monitoring state of arm
-		move_group.startStateMonitor(2.0);
+		if (rcpputils::fs::exists(file_name))
+		{
+			RCLCPP_ERROR(node_->get_logger(), "Pose with label %s already exists, pick another label!", label.c_str());
+			response->msg = "Saved pose with that label already exists, pick another label!";
+			response->saved = false;
 
-		// Get current state
-		moveit::core::RobotStatePtr current_state = move_group.getCurrentState();
+			// Stop executor spin and join thread
+			executor.cancel();
+			t.join();
+			
+			return;
+		}
 		
-		std::vector<double> current_joint_positions;
-		const moveit::core::JointModelGroup* joint_model_group =
-			move_group.getCurrentState()->getJointModelGroup(PLANNING_GROUP);
-
-		current_state->copyJointGroupPositions(joint_model_group, current_joint_positions);
 
 		// for (uint i = 0; i < NUM_JOINTS; i++)
 		// 	RCLCPP_INFO(node_->get_logger(), "J%d: %f", (i + 1), joint_group_positions[i]);
@@ -670,12 +743,7 @@ void ArmMoveGroup::save_cb_(
 	
 
 		//* Serialize current pose data and save into json
-		std::string file_name = POSE_DIR;
-		file_name.append(label);
-		file_name.append(".pose.json");
-
 		RCLCPP_INFO(node_->get_logger(), "Saving pose into: %s", file_name.c_str());
-
 		{
 			std::ofstream os(file_name.c_str());
 			cereal::JSONOutputArchive oa(os);
@@ -702,11 +770,13 @@ void ArmMoveGroup::save_cb_(
 		if (!memcmp(&current_joint_positions.front(), &sp_temp.joint_positions.front(), (size_t) NUM_JOINTS))
 		{
 			RCLCPP_INFO(node_->get_logger(), "Pose successfully saved into %s", file_name.c_str());
+			response->msg = "Pose successfully saved!";
 			response->saved = true;
 		}
 		else
 		{
 			RCLCPP_INFO(node_->get_logger(), "Saving pose failed.");
+			response->msg = "Saving pose failed, try again.";
 			response->saved = false;
 		}
 
@@ -718,14 +788,44 @@ void ArmMoveGroup::save_cb_(
 	}
 	else if (!strcmp(type.c_str(), "trajectory"))
 	{
-		size_t num_points = plan_.trajectory.joint_trajectory.points.size();
-		
+		// Check if trajectory file already exists
+		std::string file_name = TRAJ_DIR;
+		file_name.append(label);
+		file_name.append(".trajectory");
+
+		if (rcpputils::fs::exists(file_name))
+		{
+			RCLCPP_ERROR(node_->get_logger(), "Trajectory with label %s already exists, pick another label!", label.c_str());
+			response->msg = "Saved trajectory with that label already exists!";
+			response->saved = false;
+
+			// Stop executor spin and join thread
+			executor.cancel();
+			t.join();
+
+			return;
+		}
+
 		// Create SerializedTrajectory obj and allocate appropriate size for vectors
 		SerializedTrajectory st;
+		size_t num_points = plan_.trajectory.joint_trajectory.points.size();
 		st.points.resize(num_points);
+		st.starting_joint_positions.resize(plan_.trajectory.joint_trajectory.points[0].positions.size());
 		st.joint_names.resize(NUM_JOINTS);
 		st.sec.resize(num_points);
 		st.nanosec.resize(num_points);
+		st.frame_id.resize(move_group.getPlanningFrame().size()); 
+		st.model_id.resize(move_group.getRobotModel()->getName().size());
+
+		st.frame_id = move_group.getPlanningFrame();
+		st.model_id = move_group.getRobotModel()->getName();
+		RCLCPP_INFO(node_->get_logger(), "Saving start trajectory pose:\n");
+		for (uint i = 0; i < NUM_JOINTS; i++)
+		{
+			// Set 1st position in trajectory as starting pose
+			st.starting_joint_positions[i] = plan_.trajectory.joint_trajectory.points[0].positions[i];
+			RCLCPP_INFO(node_->get_logger(), "%f\n", plan_.trajectory.joint_trajectory.points[0].positions[i]);
+		}
 
 		RCLCPP_INFO(node_->get_logger(), "Saving trajectory with %lu points.", num_points);
 
@@ -744,9 +844,6 @@ void ArmMoveGroup::save_cb_(
 		}
 
 		// Serialize trajectory object and save into binary
-		std::string file_name = TRAJ_DIR;
-		file_name.append(label);
-		file_name.append(".trajectory");
 		{
 			std::ofstream os(file_name.c_str(), std::ios::binary);
 			cereal::BinaryOutputArchive oa(os);
@@ -754,13 +851,20 @@ void ArmMoveGroup::save_cb_(
 			oa( st );
 		}
 
+		RCLCPP_INFO(node_->get_logger(), "Trajectory saved at %s\n", file_name.c_str());
 		response->saved = true;
 	}
 	else
 	{
 		RCLCPP_ERROR(node_->get_logger(), "Save request unrecognized!");
+		response->msg = "Invalid save type, choose 'pose' or 'trajectory'";
 		response->saved = false;
 	}
+
+
+	// Stop executor spin and join thread
+	executor.cancel();
+	t.join();
 }
 
 
@@ -777,18 +881,35 @@ void ArmMoveGroup::execute_cb_(
 		// Node for pausing servo_node if needed
 		auto servo_pause_cli_node = rclcpp::Node::make_shared("pause_servo_cli_node_");
 		
-		rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr pause_servo_cli_;
-		pause_servo_cli_ = servo_pause_cli_node->create_client<std_srvs::srv::SetBool>("servo_node/pause_servo");
+		rclcpp::Client<SetBool>::SharedPtr pause_servo_cli;
+		rclcpp::Client<SetBool>::SharedPtr sw_hw_ctrl_mode_cli;
+
+		pause_servo_cli = servo_pause_cli_node->create_client<SetBool>("servo_node/pause_servo");
+		sw_hw_ctrl_mode_cli = servo_pause_cli_node->create_client<SetBool>("arm_hw_node/toggle_servo_mode");
 		
-		auto req = std::make_shared<std_srvs::srv::SetBool::Request>();
+
+		auto req = std::make_shared<SetBool::Request>();
 		req->data = true;
 
-		auto future = pause_servo_cli_->async_send_request(req);
-
+		auto future = pause_servo_cli->async_send_request(req);
 		if (rclcpp::spin_until_future_complete(servo_pause_cli_node, future) == rclcpp::FutureReturnCode::SUCCESS)
 			RCLCPP_INFO(node_->get_logger(), "Called pause_servo service: %s", future.get()->message.c_str());
 		else
 			RCLCPP_ERROR(node_->get_logger(), "Failed to call pause_servo service");
+		
+
+		// if (!toggled_servo_mode_)
+		// {
+			req->data = false;
+			future = sw_hw_ctrl_mode_cli->async_send_request(req);
+			if (rclcpp::spin_until_future_complete(servo_pause_cli_node, future) == rclcpp::FutureReturnCode::SUCCESS)
+				RCLCPP_INFO(node_->get_logger(), "Called arm_hw_node/toggle_servo_mode service: %s", future.get()->message.c_str());
+			else
+				RCLCPP_ERROR(node_->get_logger(), "Failed to call arm_hw_node/toggle_servo_mode service");
+
+			toggled_servo_mode_ = true;
+		// }
+
 	}
 
 
@@ -861,17 +982,32 @@ void ArmMoveGroup::execute_saved_cb_(
 	node_options.automatically_declare_parameters_from_overrides(true);
 	auto move_group_node = rclcpp::Node::make_shared("mgn", node_options);
 
+	// Preemptively make mgn /display_planned_path publisher
+	display_trajectory_pub_ = move_group_node->create_publisher<moveit_msgs::msg::DisplayTrajectory>(
+		"display_planned_path", 
+		rclcpp::QoS(5)
+	);
+
 	// Add node to executor and spin in another thread
 	rclcpp::executors::SingleThreadedExecutor executor;
 	executor.add_node(move_group_node);
 	std::thread t([&executor]() { executor.spin(); });
 
+
 	// Create move group interface using move_group_node
 	auto move_group = moveit::planning_interface::MoveGroupInterface(move_group_node, PLANNING_GROUP);
-	// auto move_group = moveit::planning_interface::MoveGroupInterface(mg_node_, PLANNING_GROUP);
+	move_group.startStateMonitor(2.0);
+	moveit::core::RobotStatePtr current_state = move_group.getCurrentState(2.0);
+	move_group.setStartState(*current_state);
+
+	const moveit::core::JointModelGroup* joint_model_group =
+		current_state->getJointModelGroup(PLANNING_GROUP);
+
+	const moveit::core::LinkModel* ee_link = joint_model_group->getLinkModel(move_group.getEndEffectorLink());
 
 
-	// Pose or trajectory
+
+	// 'pose' or 'trajectory'
 	const std::string type = request->type;
 
 	// Get user-selected pose/trajectory
@@ -880,12 +1016,22 @@ void ArmMoveGroup::execute_saved_cb_(
 
 	if (!strcmp(type.c_str(), "pose"))
 	{
+
 		std::string file_path = POSE_DIR;
 		file_path.append(label);
 		file_path.append(".pose.json");
 
+		if (!rcpputils::fs::exists(file_path))
+		{
+			RCLCPP_ERROR(node_->get_logger(), "Pose labelled %s doesn't exist!", label.c_str());
+			response->executed = false;
+			response->msg = "Pose labelled " + label + " doesn't exist!";
+			return;
+		}
 
-		// TODO: make sure file exists before loading archive
+		const double speed_factor = (double) (request->speed / 100);
+		move_group.setMaxVelocityScalingFactor(speed_factor);
+
 		// Create and load serialized pose obj
 		SerializedPose sp;
 		{
@@ -901,12 +1047,41 @@ void ArmMoveGroup::execute_saved_cb_(
 			RCLCPP_WARN(node_->get_logger(), "Target joint position(s) were outside of limits, but we will plan and clamp to the limits ");
 		}
 
+		
 		bool success = (move_group.plan(plan_) == moveit::core::MoveItErrorCode::SUCCESS);
 
 		if (success)
 		{
 			RCLCPP_INFO(node_->get_logger(), "Motion plan successful!\n");
 			response->executed = true;
+
+			if (visualize_trajectories_)
+			{
+				moveit_visual_tools::MoveItVisualTools visual_tools(
+					move_group_node,
+					move_group.getPlanningFrame(),
+					"arm_marker_array",
+					move_group.getRobotModel());
+
+				visual_tools.deleteAllMarkers();
+
+				bool visualized = visual_tools.publishTrajectoryLine(
+					plan_.trajectory,
+					ee_link,
+					joint_model_group
+				);
+
+				visual_tools.trigger();
+				
+				if (visualized)
+					RCLCPP_INFO(node_->get_logger(), "Motion plan visualized.");
+				else
+					RCLCPP_ERROR(node_->get_logger(), "Motion plan visualization failed\n");
+
+				moveit_msgs::msg::DisplayTrajectory dt;
+				dt.model_id = move_group.getRobotModel()->getName();;
+				RCLCPP_INFO(node_->get_logger(), "Displaying trajectory for robot %s", dt.model_id.c_str());
+			}
 		}
 		else
 		{
@@ -920,7 +1095,22 @@ void ArmMoveGroup::execute_saved_cb_(
 		file_path.append(label);
 		file_path.append(".trajectory");
 
-		// TODO: make sure file exists before loading archive
+		// Check if trajectory file  with same label already exists
+		if (!rcpputils::fs::exists(file_path))
+		{
+			RCLCPP_ERROR(node_->get_logger(), "Trajectory labelled %s doesn't exist!", label.c_str());
+			response->executed = false;
+			response->msg = "Trajectory labelled " + label + " doesn't exist!";
+			
+			// Stop executor spin and join thread
+			executor.cancel();
+			t.join();
+
+			return;
+		}		
+
+
+
 		// Read saved trajectory
 		SerializedTrajectory st;
 		{
@@ -930,9 +1120,54 @@ void ArmMoveGroup::execute_saved_cb_(
 			ia( st );
 		}
 
-		RCLCPP_INFO(node_->get_logger(), "Loaded trajectory with %lu points", st.points.size());
-		
+		RCLCPP_INFO(node_->get_logger(), "\nLoaded trajectory %s with\nframe_id: %s\nmodel_id: %s\n%lu points\n", label.c_str(), st.frame_id.c_str(), st.model_id.c_str(), st.points.size());
+		// RCLCPP_INFO(node_->get_logger(), "Trajectory start pose: [%f %f %f %f %f %f]",
+		// 								st.starting_joint_positions[0], st.starting_joint_positions[1],
+		// 								st.starting_joint_positions[2], st.starting_joint_positions[3],
+		// 								st.starting_joint_positions[4], st.starting_joint_positions[5]);
 
+
+
+		// Check current pose against trajectory starting pose
+		uint count = 0;
+		std::vector<double> current_joint_pos;
+		current_state->copyJointGroupPositions(joint_model_group, current_joint_pos);
+		for (uint i = 0; i < NUM_JOINTS; i++)
+		{
+			// RCLCPP_INFO(node_->get_logger(), "Difference: %f", st.starting_joint_positions[i] - current_joint_pos[i]);
+			// RCLCPP_INFO(node_->get_logger(), "Difference (abs): %f", std::abs(st.starting_joint_positions[i] - current_joint_pos[i]));
+			
+			// if current state is within 5 degrees of trajectory start state
+			if (std::abs(st.starting_joint_positions[i] - current_joint_pos[i]) <= 0.0873)
+				count++;
+		}
+
+		if (count != NUM_JOINTS)
+		{
+			char return_msg[256];
+			sprintf(return_msg, "Current pose does not match trajectory start pose!\nCurrent state: [%f %f %f %f %f %f]\nStart state: [%f %f %f %f %f %f]\n",
+								current_joint_pos[0], current_joint_pos[1], current_joint_pos[2], current_joint_pos[3], current_joint_pos[4], current_joint_pos[5],
+								st.starting_joint_positions[0], st.starting_joint_positions[1], st.starting_joint_positions[2], st.starting_joint_positions[3], st.starting_joint_positions[4], st.starting_joint_positions[5]);
+
+			RCLCPP_WARN(node_->get_logger(), "Current pose does not match trajectory start pose!\nCurrent state: [%f %f %f %f %f %f]\nStart state: [%f %f %f %f %f %f]\n",
+								current_joint_pos[0], current_joint_pos[1], current_joint_pos[2], current_joint_pos[3], current_joint_pos[4], current_joint_pos[5],
+								st.starting_joint_positions[0], st.starting_joint_positions[1], st.starting_joint_positions[2], st.starting_joint_positions[3], st.starting_joint_positions[4], st.starting_joint_positions[5]);
+			
+			response->msg = return_msg;
+			response->executed = false;
+
+			// Stop executor spin and join thread
+			executor.cancel();
+			t.join();
+
+			return;
+		}
+
+		RCLCPP_INFO(node_->get_logger(), "Current pose matches trajectory start pose!");
+
+
+
+		// Reconstruct trajectory object 
 		moveit_msgs::msg::RobotTrajectory trajectory;
 		trajectory.joint_trajectory.joint_names.resize(NUM_JOINTS);
 		trajectory.joint_trajectory.points.resize(st.points.size());
@@ -954,25 +1189,53 @@ void ArmMoveGroup::execute_saved_cb_(
 			trajectory.joint_trajectory.points[i].time_from_start.nanosec = st.nanosec[i];
 		}
 
-		RCLCPP_INFO(node_->get_logger(), "Attempting to execute saved trajectory...");
-		
-		// TODO: preview motion plan before moving
+		RCLCPP_INFO(node_->get_logger(), "Reconstructed trajectory.");
 
-		if (move_group.execute(trajectory) == moveit::core::MoveItErrorCode::SUCCESS)
-		{
-			RCLCPP_INFO(node_->get_logger(), "Success!");
-			response->executed = true;
-		}
-		else
-		{
-			RCLCPP_ERROR(node_->get_logger(), "Execution failed");
-			response->executed = false;
-		}
 
+
+		if (visualize_trajectories_)
+		{
+			// Reconstruct trajectory display
+			moveit_msgs::msg::DisplayTrajectory display_trajectory;
+			display_trajectory.trajectory_start.is_diff = false;
+			display_trajectory.trajectory_start.joint_state.name.resize(1);
+			display_trajectory.trajectory_start.joint_state.name[0] = st.model_id;
+			display_trajectory.trajectory_start.joint_state.position.resize(st.starting_joint_positions.size());
+			display_trajectory.trajectory_start.joint_state.position = st.starting_joint_positions;
+			display_trajectory.model_id = st.model_id;
+			display_trajectory.trajectory.resize(1);
+			display_trajectory.trajectory[0] = trajectory;
+
+			moveit_visual_tools::MoveItVisualTools visual_tools(
+				move_group_node,
+				move_group.getPlanningFrame(),
+				"arm_marker_array",
+				move_group.getRobotModel());
+
+			visual_tools.deleteAllMarkers();
+
+			bool visualized = visual_tools.publishTrajectoryLine(
+				trajectory,
+				ee_link,
+				joint_model_group
+			);
+
+			// Display trajectory marker array
+			visual_tools.trigger();
+			
+			// Display trajectory arm animation
+			display_trajectory_pub_->publish(display_trajectory);
+			
+			if (visualized)
+				RCLCPP_INFO(node_->get_logger(), "Motion plan visualized.");
+			else
+				RCLCPP_ERROR(node_->get_logger(), "Motion plan visualization failed\n");
+		}
 	}
 	else
 	{
 		RCLCPP_ERROR(node_->get_logger(), "Invalid type!");
+		response->msg = "Invalid type " + type + ", select 'pose' or 'trajectory'";
 		response->executed = false;
 	}
 
@@ -1046,15 +1309,15 @@ int main(int argc, char** argv)
 
 	auto arm_move_group = ArmMoveGroup();
 
-	rclcpp::executors::MultiThreadedExecutor executor;
+	// rclcpp::executors::MultiThreadedExecutor executor;
 	// executor.add_node(arm_move_group.mg_node_);
-	executor.add_node(arm_move_group.node_);
+	// executor.add_node(arm_move_group.node_);
 	// std::thread([&executor]() { executor.spin(); }).detach();
 
 	try
 	{
-		// rclcpp::spin(arm_move_group.node_);
-		executor.spin();
+		rclcpp::spin(arm_move_group.node_);
+		// executor.spin();
 	}
 	catch(const std::exception& e)
 	{

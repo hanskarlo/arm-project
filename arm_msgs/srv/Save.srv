@@ -8,3 +8,6 @@ string type
 
 # Indicate successful save
 bool saved
+
+# Message indicating success or reason for failure
+string msg

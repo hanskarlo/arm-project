@@ -1,7 +1,9 @@
 #include <chrono>
 #include <thread>
+#include <sys/stat.h>
 
 #include <fstream>
+#include <filesystem>
 #include <cereal/archives/binary.hpp>
 #include <cereal/archives/json.hpp>
 #include <cereal/types/vector.hpp>
@@ -53,15 +55,16 @@ class ArmMoveGroup
         const std::string PLANNING_GROUP = "arm_group";
         const std::string NODE_NAME = "arm_move_group";
 
-        const std::string PKG_DIR = "/home/arodev0/arm_ws/src/zeroerr_arm/zeroerr_move_group/";
-        const std::string POSE_DIR = PKG_DIR + "poses/";
-        const std::string TRAJ_DIR = PKG_DIR + "trajectories/";
+        const std::string WS_DIR = rcpputils::fs::current_path().string();
+        const std::string PKG_DIR = WS_DIR + "/src/arm-project/" + NODE_NAME;
+        const std::string POSE_DIR = PKG_DIR + "/poses/";
+        const std::string TRAJ_DIR = PKG_DIR + "/trajectories/";
 
         //* ROS2 Parameters
         bool visualize_trajectories_ = true;
         bool servoing_ = false;
 
-        bool in_execution_ = false;
+        bool toggled_servo_mode_ = false;
         bool joint_space_goal_recv_ = false;
         bool pose_goal_recv_ = false;
         bool linear_trajectory_recv_ = false;
@@ -70,6 +73,7 @@ class ArmMoveGroup
 
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr collision_obj_sub_;
         rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_clear_sub_; 
+        rclcpp::Publisher<moveit_msgs::msg::DisplayTrajectory>::SharedPtr display_trajectory_pub_;
 
         using ExecutionFeedback = moveit_msgs::action::ExecuteTrajectory_FeedbackMessage;
         rclcpp::Subscription<ExecutionFeedback>::SharedPtr execution_feedback_sub_;
@@ -88,6 +92,7 @@ class ArmMoveGroup
         using Save = arm_msgs::srv::Save;
         using MoveToSaved = arm_msgs::srv::MoveToSaved;
         using GetState = arm_msgs::srv::GetState;
+        using SetBool = std_srvs::srv::SetBool;
 
         rclcpp::Service<Trigger>::SharedPtr execute_srv_;
         rclcpp::Service<Trigger>::SharedPtr stop_srv_;
@@ -98,7 +103,7 @@ class ArmMoveGroup
         rclcpp::Service<MoveToSaved>::SharedPtr move_to_saved_srv_;  
         rclcpp::Service<GetState>::SharedPtr get_state_srv_;
 
-        rclcpp::Client<Trigger>::SharedPtr pause_servo_input_cli_;
+        rclcpp::Client<SetBool>::SharedPtr pause_servo_input_cli_;
 
 
         // Service callbacks
@@ -132,6 +137,15 @@ class ArmMoveGroup
 
         struct SerializedTrajectory
         {   
+            // Frame ID
+            std::string frame_id;
+
+            // Model ID
+            std::string model_id;
+
+            // Joint positions at start
+            std::vector<double> starting_joint_positions;
+
             // Joint trajectory positions
             std::vector< std::vector<double> > points;
 
@@ -145,7 +159,7 @@ class ArmMoveGroup
             template<class Archive>
             void serialize(Archive & archive)
             {
-                archive( points, joint_names, sec, nanosec );
+                archive( frame_id, model_id, starting_joint_positions, points, joint_names, sec, nanosec );
             }
         };
 

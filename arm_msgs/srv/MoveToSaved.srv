@@ -4,7 +4,13 @@ string label
 # Indicate "pose" or "trajectory"
 string type
 
+# If pose is selected, indicate what speed to move at [0-100%]
+uint8 speed
+
 ---
 
 # Indicate successful start to execution
 bool executed
+
+# Error message if failed
+string msg
