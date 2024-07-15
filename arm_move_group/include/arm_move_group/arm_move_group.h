@@ -79,8 +79,6 @@ class ArmMoveGroup
         rclcpp::Subscription<ExecutionFeedback>::SharedPtr execution_feedback_sub_;
 
 
-        moveit_msgs::msg::RobotTrajectory trajectory_;
-
         void clear_cb_(const std_msgs::msg::Bool::SharedPtr clear_msg);
         void exec_feedback_cb_(const ExecutionFeedback::SharedPtr feedback);
 

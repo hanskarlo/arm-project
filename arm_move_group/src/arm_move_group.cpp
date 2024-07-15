@@ -69,7 +69,7 @@ ArmMoveGroup::ArmMoveGroup()
 
 	if (servoing_)
 	{
-		RCLCPP_INFO(node_->get_logger(), "In servo mode.\n");
+		RCLCPP_INFO(node_->get_logger(), "In servo mode.");
 		execution_feedback_sub_ = node_->create_subscription<ExecutionFeedback>(
 			"/execute_trajectory/_action/feedback",
 			rclcpp::QoS(1),
@@ -77,7 +77,7 @@ ArmMoveGroup::ArmMoveGroup()
 		);
 	}
 	else
-		RCLCPP_INFO(node_->get_logger(), "Not in servo mode.\n");
+		RCLCPP_INFO(node_->get_logger(), "Not in servo mode.");
 	
 
 
@@ -124,7 +124,7 @@ ArmMoveGroup::ArmMoveGroup()
 	}
 
 
-	RCLCPP_INFO(node_->get_logger(), "Initialized!");
+	RCLCPP_INFO(node_->get_logger(), "Initialized!\n");
 }
 
 ArmMoveGroup::~ArmMoveGroup()
@@ -451,8 +451,6 @@ void ArmMoveGroup::pose_goal_array_cb_(
 
 	if (!strcmp(type.c_str(), "linear"))
 	{
-		linear_trajectory_recv_ = true;
-
 		std::vector<geometry_msgs::msg::Pose> waypoints;
 		// waypoints.push_back(move_group.getCurrentPose().pose);
 
@@ -462,18 +460,20 @@ void ArmMoveGroup::pose_goal_array_cb_(
 		for (size_t i = 0; i < request->waypoints.size(); i++)
 			waypoints.push_back(request->waypoints[i]);
 		
-		// moveit_msgs::msg::RobotTrajectory trajectory;
+		moveit_msgs::msg::RobotTrajectory trajectory;
 		// const double jump_threshold = 0.0;	// Disable jump threshold
 		// const double eef_step = 0.01; 		// 1cm interpolation resolution
 		const double jump_threshold = request->jump_threshold;
 		const double eef_step = request->step_size;
-		double fraction = move_group.computeCartesianPath(waypoints, eef_step, jump_threshold, trajectory_);
+		double fraction = move_group.computeCartesianPath(waypoints, eef_step, jump_threshold, trajectory);
 
 		// If percent of path achieved >= 95%
 		if ((fraction * 100.0) >= 95.0 )
 		{
 			RCLCPP_INFO(node_->get_logger(), "Planning cartesian path (%.2f%% achieved)", fraction * 100.0);
 			response->success = true;
+
+			plan_.trajectory = trajectory;
 
 			if (visualize_trajectories_)
 			{
@@ -486,7 +486,7 @@ void ArmMoveGroup::pose_goal_array_cb_(
 				visual_tools.deleteAllMarkers();
 
 				bool visualized = visual_tools.publishTrajectoryLine(
-					trajectory_,
+					trajectory,
 					ee_link,
 					joint_model_group
 				);
@@ -780,11 +780,6 @@ void ArmMoveGroup::save_cb_(
 			response->saved = false;
 		}
 
-
-		// Stop executor spin and join thread
-		executor.cancel();
-		t.join();
-
 	}
 	else if (!strcmp(type.c_str(), "trajectory"))
 	{
@@ -933,37 +928,17 @@ void ArmMoveGroup::execute_cb_(
 	move_group.setStartStateToCurrentState();
 
 
-	if (linear_trajectory_recv_)
+	if (move_group.asyncExecute(plan_) == moveit::core::MoveItErrorCode::SUCCESS)
 	{
-		if (move_group.asyncExecute(trajectory_) == moveit::core::MoveItErrorCode::SUCCESS)
-		{
-			RCLCPP_INFO(node_->get_logger(), "Linear trajectory motion plan executed!\n");
-			response->message = "Linear trajectory motion plan executed!\n";
-			response->success = true;
-		}
-		else
-		{
-			RCLCPP_ERROR(node_->get_logger(), "Motion execution failed\n");
-			response->message = "Motion execution failed";
-			response->success = false;
-		}
-		
-		linear_trajectory_recv_ = false;
+		RCLCPP_INFO(node_->get_logger(), "Motion plan executed!\n");
+		response->message = "Motion plan executed!\n";
+		response->success = true;
 	}
 	else
 	{
-		if (move_group.asyncExecute(plan_) == moveit::core::MoveItErrorCode::SUCCESS)
-		{
-			RCLCPP_INFO(node_->get_logger(), "Motion plan executed!\n");
-			response->message = "Motion plan executed!\n";
-			response->success = true;
-		}
-		else
-		{
-			RCLCPP_ERROR(node_->get_logger(), "Motion execution failed\n");
-			response->message = "Motion execution failed";
-			response->success = false;
-		}
+		RCLCPP_ERROR(node_->get_logger(), "Motion execution failed\n");
+		response->message = "Motion execution failed";
+		response->success = false;
 	}
 
 	// Stop executor spin and join thread
@@ -1189,7 +1164,10 @@ void ArmMoveGroup::execute_saved_cb_(
 			trajectory.joint_trajectory.points[i].time_from_start.nanosec = st.nanosec[i];
 		}
 
+		plan_.trajectory = trajectory;
 		RCLCPP_INFO(node_->get_logger(), "Reconstructed trajectory.");
+
+
 
 
 
@@ -1223,13 +1201,14 @@ void ArmMoveGroup::execute_saved_cb_(
 			// Display trajectory marker array
 			visual_tools.trigger();
 			
-			// Display trajectory arm animation
-			display_trajectory_pub_->publish(display_trajectory);
-			
 			if (visualized)
 				RCLCPP_INFO(node_->get_logger(), "Motion plan visualized.");
 			else
 				RCLCPP_ERROR(node_->get_logger(), "Motion plan visualization failed\n");
+
+
+			// Display trajectory arm animation
+			display_trajectory_pub_->publish(display_trajectory);
 		}
 	}
 	else
