@@ -11,9 +11,9 @@ The software was tested on an ASUS PN50 with
 <br>
 
 ## Built with
+[<img src="https://automaticaddison.com/wp-content/uploads/2023/10/ros2-iron.png" alt="ROS2 Iron Logo" width="240"/>](https://docs.ros.org/en/iron/Releases/Release-Iron-Irwini.html)
+[<img src="https://images.squarespace-cdn.com/content/v1/606d378755a86f589aa297b7/1717136168404-CV7O6LD1M56PNET8G161/JazzyJalisco_Final.png" alt="ROS2 Jazzy Logo" width="264"/>](https://docs.ros.org/en/jazzy/index.html)
 
-[<img src="https://images.squarespace-cdn.com/content/v1/606d378755a86f589aa297b7/1653397531343-6M4IQ4JWDQV1SQ8W17UN/HumbleHawksbill_TransparentBG-NoROS.png" alt="MoveIt Logo" width="200"/>](https://docs.ros.org/en/humble/index.html)
-[<img src="https://automaticaddison.com/wp-content/uploads/2023/10/ros2-iron.png" alt="MoveIt Logo" width="240"/>](https://docs.ros.org/en/iron/Releases/Release-Iron-Irwini.html)
 
 [<img src="https://moveit.ros.org/assets/logo/moveit_logo-black.png" alt="MoveIt Logo" width="200"/>](https://github.com/ros-planning/moveit2)
 
@@ -24,27 +24,31 @@ The software was tested on an ASUS PN50 with
 ## Getting started
 
 ### Prerequisites
-* Linux Kernel with Real-time patch (**Optional**)
-* Ethernet hardware
-* Ubuntu 22.04 (Jammy Jellyfish)
-* ROS2 Humble Hawksbill or ROS2 Iron Irwini
+* Linux Kernel with Real-time patch (Optional, **Recommended**)
+* Linux Kernel with Xenomai 3 (Dovetail, Cobalt Core) (Optional, **Highly Recommended**)
+* PC with Ethernet hardware
+* Ubuntu 22.04 (Jammy Jellyfish) and ROS2 Iron
+  * Or Ubuntu 24 (Noble) and ROS2 Jazzy
 * MoveIt2 Humble or MoveIt2 Iron
 * IgH EtherCAT Master for Linux
+  * Compilation with Xenomai 3 kernel highly recommended
 * cereal - A C++11 library for serialization
 
 <br>
 
 ### Installation
 
-#### Dependencies
+#### ros2_control
 
-To install the **ros2_control** software necessary for the hardware interface and controllers:
+Install the **ros2_control** software necessary for the hardware interface and controllers:
 ```bash
 sudo apt install ros-<your ros distro>-ros2-control
 sudo apt install ros-<your ros distro>-ros2-controllers
 ```
 
 <br>
+
+#### cereal
 
 [**cereal**](https://uscilab.github.io/cereal/quickstart.html) is used for storing poses and trajectories by way of serialization and is used by the **arm_move_group** package.
 
@@ -56,6 +60,8 @@ sudo cp -r ~/Downloads/cereal-1.3.2/include/cereal /usr/include/
 ```
 
 <br>
+
+#### Extra MoveIt2 Packages
 
 If MoveIt2 software was compiled and built using the source code, skip to the [Build order](#build-order) section.
 Otherwise, if MoveIt2 was installed via binary installation, the following packages will need to be installed:
@@ -69,11 +75,14 @@ sudo apt install ros-$ROS_DISTRO-pick-ik
 
 <br>
 
+#### EtherCAT Kernel Module
+
 The IgH EtherLab EtherCAT Master software installation is only required if interfacing with the ZeroErr arm hardware. Refer to the [documentation](https://docs.etherlab.org/ethercat/1.5/pdf/ethercat_doc.pdf#chapter.9) on how to install it.
 
 
 <br>
 <br>
+
 
 ### Build order
 
