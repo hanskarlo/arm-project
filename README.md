@@ -1,5 +1,7 @@
 # Arm Project MoveIt2 Repository
 
+![PGA Demo](docs/images/ZeroErrArm_PGA_Test.gif)
+
 ## About
 This repository hosts the software for ROS2 integration with a 6 DoF 5kg ZeroErr arm for leveraging MoveIt2 features such as motion/trajectory planning, kinematic control, collision checking, and 3D perception.
 
