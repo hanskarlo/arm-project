@@ -89,38 +89,7 @@ namespace arm_hardware
 
         sw_hw_ctrl_mode_srv_ = hw_node_->create_service<std_srvs::srv::SetBool>(
             "arm_hw_node/toggle_servo_mode",
-            [this](
-                const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
-                std::shared_ptr<std_srvs::srv::SetBool::Response> response
-            )
-            {
-                bool servo_mode = request->data;
-                if (servo_mode)
-                {
-                    ctrl_mode = SERVO;
-
-                    // if (!track_start_pose_)
-                    // {
-                        start_pose_recv_ = false;
-                        track_start_pose_ = true;
-                    // }
-
-                    response->success = true;
-                    response->message = "Switched to servo mode";
-                    
-                    RCLCPP_INFO(hw_node_->get_logger(), "%s", response->message.c_str());
-                }
-                else
-                {
-                    ctrl_mode = PLAN;
-                    // start_pose_recv_ = false;
-                    // track_start_pose_ = false;
-                    // servo_init_ = false;
-                    response->success = true;
-                    response->message = "Switched to planning mode";
-                    RCLCPP_INFO(hw_node_->get_logger(), "%s", response->message.c_str());
-                }
-            }
+            std::bind(&ArmHardwareInterface::switchControlMode, this, std::placeholders::_1, std::placeholders::_2)
         );
 
 
@@ -153,6 +122,33 @@ namespace arm_hardware
 
         LOG_INFO("[on_init] Finished successfully!");
         return CallbackReturn::SUCCESS;
+    }
+
+
+    void ArmHardwareInterface::switchControlMode(                
+        const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+        std::shared_ptr<std_srvs::srv::SetBool::Response> response)
+    {
+        bool servo_mode = request->data;
+        if (servo_mode)
+        {
+            ctrl_mode = SERVO;
+
+            start_pose_recv_ = false;
+            track_start_pose_ = true;
+
+            response->success = true;
+            response->message = "Switched to servo mode";
+            RCLCPP_INFO(hw_node_->get_logger(), "%s", response->message.c_str());
+        }
+        else
+        {
+            ctrl_mode = PLAN;
+
+            response->success = true;
+            response->message = "Switched to planning mode";
+            RCLCPP_INFO(hw_node_->get_logger(), "%s", response->message.c_str());
+        }
     }
 
 

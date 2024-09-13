@@ -120,6 +120,11 @@ namespace arm_hardware
                     return default_value; // return default_value as topic
             }
 
+            void switchControlMode(
+                const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+                std::shared_ptr<std_srvs::srv::SetBool::Response> response);
+
+
             // Hardware interface node
             rclcpp::Node::SharedPtr hw_node_;
 
