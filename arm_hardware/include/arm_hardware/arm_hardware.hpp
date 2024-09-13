@@ -129,7 +129,6 @@ namespace arm_hardware
             rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr sw_hw_ctrl_mode_srv_;
             rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr pause_servo_cli_;
 
-
             sensor_msgs::msg::JointState latest_arm_state_;
 
             // Position state interface vector
@@ -151,7 +150,9 @@ namespace arm_hardware
 
             // Position of joints at start
             double starting_pos_[NUM_JOINTS];
-            
+
+            bool track_start_pose_ = false;
+
             /// Flag indicating start pose was stored
             bool start_pose_recv_ = false;
 
