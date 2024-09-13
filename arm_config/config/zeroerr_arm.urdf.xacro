@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="ArmProject">
     <xacro:arg name="ros2_control_hardware_type" default="sim" />
+    <xacro:arg name="control_mode" default="plan" />
 
     <!-- Import zeroerr_arm urdf file -->
     <xacro:include filename="$(find arm_description)/urdf/zeroerr.urdf" />
@@ -8,6 +9,6 @@
     <!-- Import control_xacro -->
     <xacro:include filename="zeroerr_arm.ros2_control.xacro" />
 
-    <xacro:arm_ros2_control name="ArmProject" ros2_control_hardware_type="$(arg ros2_control_hardware_type)"/>
+    <xacro:arm_ros2_control name="ArmProject" ros2_control_hardware_type="$(arg ros2_control_hardware_type)" control_mode="$(arg control_mode)"/>
 
 </robot>

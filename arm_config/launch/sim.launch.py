@@ -14,13 +14,19 @@ def generate_launch_description():
     ros2_control_hardware_type = DeclareLaunchArgument(
         "hardware_type",
         default_value="sim",
-        description="ROS 2 control hardware interface type to use for the launch file -- possible values: [sim, isaac]",
+        description="ROS 2 control hardware interface type to use for the launch file -- possible values: [real, sim]",
+    )
+
+    control_mode = DeclareLaunchArgument(
+        "control_mode",
+        default_value="plan",
+        description="Control mode -- possible values: [pkan, servo]",
     )
 
     moveit_config = (
         MoveItConfigsBuilder("ArmProject", package_name="arm_config")
         .robot_description(
-            file_path="config/zeroerr_arm_servo.urdf.xacro",
+            file_path="config/zeroerr_arm.urdf.xacro",
             mappings={
                 "ros2_control_hardware_type": LaunchConfiguration("hardware_type"),
                 "control_mode": LaunchConfiguration("control_mode")
@@ -31,11 +37,11 @@ def generate_launch_description():
             publish_robot_description=True, 
             publish_robot_description_semantic=True
         )
-        .joint_limits(file_path="config/servo_joint_limits.yaml")
+        .joint_limits(file_path="config/joint_limits.yaml")
         .trajectory_execution(file_path="config/moveit_controllers.yaml")
         .planning_pipelines(
             pipelines=[
-                "ompl", 
+                # "ompl", 
                 "chomp", 
                 "pilz_industrial_motion_planner", 
                 "stomp"
@@ -132,6 +138,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             ros2_control_hardware_type,
+            control_mode,
             rviz_node,
             static_tf_node,
             robot_state_publisher,
