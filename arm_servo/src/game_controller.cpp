@@ -69,7 +69,10 @@ class GameController
         double cartesian_step_size_; // meters
         std::string command_frame_id_;
 
+        bool enabled_;
+
         // Flag to enable rising-edge triggering of buttons
+        bool enable_cmd_toggle_;
         bool servo_cmd_toggle_;
         bool right_bumper_toggle_;
         bool left_bumper_toggle_;
@@ -89,8 +92,10 @@ class GameController
 
 GameController::GameController() : 
     joint_vel_cmd_(0.1), 
-    cartesian_step_size_(0.1), 
+    cartesian_step_size_(0.1),
     command_frame_id_{"arm_Link"},
+    enabled_(false),
+    enable_cmd_toggle_(true),
     servo_cmd_toggle_(true),
     right_bumper_toggle_(true),
     left_bumper_toggle_(true),
@@ -107,24 +112,61 @@ GameController::GameController() :
     twist_pub_ = nh_->create_publisher<geometry_msgs::msg::TwistStamped>(TWIST_TOPIC, ROS_QUEUE_SIZE);
 
     // Joy feedback publisher
-    joy_fb_pub_ = nh_->create_publisher<sensor_msgs::msg::JoyFeedback>(JOY_FB_TOPIC, ROS_QUEUE_SIZE);
+    joy_fb_pub_ = service_node_->create_publisher<sensor_msgs::msg::JoyFeedback>(JOY_FB_TOPIC, ROS_QUEUE_SIZE);
     
     // Joy topic subscriber
     joy_sub_ = nh_->create_subscription<sensor_msgs::msg::Joy>(JOY_TOPIC, ROS_QUEUE_SIZE, std::bind(&GameController::joy_cb_, this, std::placeholders::_1));
+
 
     // Client for switching input types, start in JointJog mode by default
     servo_command_type_ = std::make_shared<moveit_msgs::srv::ServoCommandType::Request>();
     servo_command_type_->command_type = moveit_msgs::srv::ServoCommandType::Request::JOINT_JOG;
     servo_cmd_type_cli_ = service_node_->create_client<moveit_msgs::srv::ServoCommandType>("servo_node/switch_command_type");
-    servo_cmd_type_cli_->wait_for_service(std::chrono::seconds(2));
-    servo_cmd_type_cli_->async_send_request(servo_command_type_);
+    while(!servo_cmd_type_cli_->wait_for_service(std::chrono::seconds(1)));
+    
+    auto future = servo_cmd_type_cli_->async_send_request(servo_command_type_);
+    
+    using namespace std::chrono_literals;
+    while(rclcpp::spin_until_future_complete(service_node_, future, 5s) != rclcpp::FutureReturnCode::SUCCESS){
+        RCLCPP_ERROR(service_node_->get_logger(), "Could not call /servo_node/switch_command_type...");
+    }
 
-    RCLCPP_INFO(service_node_->get_logger(), "Servo mode starting in JointJog");
+    RCLCPP_INFO(service_node_->get_logger(), "Servo mode starting in JointJog mode.");
+    RCLCPP_WARN(nh_->get_logger(), "Input is currently disabled. Press the GUIDE button to enable.");
 }
 
 
 void GameController::joy_cb_(const sensor_msgs::msg::Joy::SharedPtr joy_msg)
 {
+    // GUIDE button used to enable/disable game controller input manually
+    if ((joy_msg->buttons[GUIDE] == PRESSED) && enable_cmd_toggle_)
+    {
+        enabled_ = !enabled_;
+
+        RCLCPP_INFO(nh_->get_logger(), enabled_ ? "Game controller input enabled!" : "Game controller input disabled!");
+
+
+        sensor_msgs::msg::JoyFeedback feedback;
+        feedback.type = sensor_msgs::msg::JoyFeedback::TYPE_RUMBLE;
+        feedback.intensity = 0.25;
+
+        joy_fb_pub_->publish(feedback);
+        rclcpp::spin_some(service_node_);
+
+
+        enable_cmd_toggle_ = false;
+        return;
+    }
+    else if ((joy_msg->buttons[GUIDE] == !PRESSED) && !enable_cmd_toggle_)
+    {
+        enable_cmd_toggle_ = true;
+        return;
+    }
+
+
+    // Ignore other buttons if disabled
+    if (!enabled_) return;
+
 
     // MENU button used to toggle b/e Joint and Cartesian jogging modes
     if ((joy_msg->buttons[MENU] == PRESSED) && servo_cmd_toggle_)
@@ -234,16 +276,12 @@ void GameController::joy_cb_(const sensor_msgs::msg::Joy::SharedPtr joy_msg)
 
     if (servo_command_type_->command_type == moveit_msgs::srv::ServoCommandType::Request::JOINT_JOG)
     {
-        auto joint_msg = std::make_unique<control_msgs::msg::JointJog>();
-        joint_msg->header.frame_id = "arm_Link";
-        joint_msg->header.stamp = nh_->now();
-
-        joint_msg->joint_names.resize(6);
-        joint_msg->joint_names = { "j1", "j2", "j3", "j4", "j5", "j6"};
-
-        joint_msg->velocities.resize(6, 0.0);
-
-
+        control_msgs::msg::JointJog joint_msg_;
+        joint_msg_.header.frame_id = "arm_Link";
+        joint_msg_.header.stamp = nh_->now();
+        joint_msg_.velocities.resize(6, 0.0);
+        joint_msg_.joint_names.resize(6);
+        joint_msg_.joint_names = { "j1", "j2", "j3", "j4", "j5", "j6"};
 
         // DPAD RIGHT/LEFT used to switch between joints
         if (joy_msg->buttons[DPAD_RIGHT] == PRESSED && dpad_toggle_)
@@ -251,7 +289,15 @@ void GameController::joy_cb_(const sensor_msgs::msg::Joy::SharedPtr joy_msg)
             joint_num_++;
             if (joint_num_ > (NUM_JOINTS - 1)) joint_num_ = 0;
 
-            RCLCPP_INFO(nh_->get_logger(), "Controlling J%d", (joint_num_ + 1));
+            // RCLCPP_INFO(nh_->get_logger(), "Controlling J%d", (joint_num_ + 1));
+            RCLCPP_INFO(nh_->get_logger(), "Controlling %s joint", 
+                (joint_num_ == 0) ? "Base"      :
+                (joint_num_ == 1) ? "Shoulder"  :
+                (joint_num_ == 2) ? "Elbow"     :
+                (joint_num_ == 3) ? "Wrist 1"   :
+                (joint_num_ == 4) ? "Wrist 2"   :
+                (joint_num_ == 5) ? "Wrist 3"   :
+                                    "Unknown"   );
 
             dpad_toggle_ = false;
             return;
@@ -261,7 +307,15 @@ void GameController::joy_cb_(const sensor_msgs::msg::Joy::SharedPtr joy_msg)
             joint_num_--;
             if (joint_num_ < 0) joint_num_ = (NUM_JOINTS - 1);
 
-            RCLCPP_INFO(nh_->get_logger(), "Controlling J%d", (joint_num_ + 1));
+            // RCLCPP_INFO(nh_->get_logger(), "Controlling J%d", (joint_num_ + 1));
+            RCLCPP_INFO(nh_->get_logger(), "Controlling %s joint", 
+                (joint_num_ == 0) ? "Base"      :
+                (joint_num_ == 1) ? "Shoulder"  :
+                (joint_num_ == 2) ? "Elbow"     :
+                (joint_num_ == 3) ? "Wrist 1"   :
+                (joint_num_ == 4) ? "Wrist 2"   :
+                (joint_num_ == 5) ? "Wrist 3"   :
+                                    "Unknown"   );
 
             dpad_toggle_ = false;
             return;
@@ -273,13 +327,13 @@ void GameController::joy_cb_(const sensor_msgs::msg::Joy::SharedPtr joy_msg)
         // RIGHT/LEFT BUMPER used to move joint at fixed speed
         if (joy_msg->buttons[RIGHT_BUMPER] == PRESSED)
         {
-            joint_msg->velocities[joint_num_] = joint_vel_cmd_;
-            joint_pub_->publish(std::move(joint_msg));
+            joint_msg_.velocities[joint_num_] = joint_vel_cmd_;
+            joint_pub_->publish(joint_msg_);
         }
-        if (joy_msg->buttons[LEFT_BUMPER] == PRESSED)
+        else if (joy_msg->buttons[LEFT_BUMPER] == PRESSED)
         {
-            joint_msg->velocities[joint_num_] = -joint_vel_cmd_;
-            joint_pub_->publish(std::move(joint_msg));
+            joint_msg_.velocities[joint_num_] = -joint_vel_cmd_;
+            joint_pub_->publish(joint_msg_);
         }
         
 
@@ -287,13 +341,13 @@ void GameController::joy_cb_(const sensor_msgs::msg::Joy::SharedPtr joy_msg)
         // RIGHT/LEFT TRIGGER(s) used to jog joint at variable speed
         if (joy_msg->axes[RIGHT_TRIGGER])
         {
-            joint_msg->velocities[joint_num_] = (10 * joint_vel_cmd_) * (-joy_msg->axes[RIGHT_TRIGGER]);
-            joint_pub_->publish(std::move(joint_msg));
+            joint_msg_.velocities[joint_num_] = (10 * joint_vel_cmd_) * (-joy_msg->axes[RIGHT_TRIGGER]);
+            joint_pub_->publish(joint_msg_);
         }
-        if (joy_msg->axes[LEFT_TRIGGER])
+        else if (joy_msg->axes[LEFT_TRIGGER])
         {
-            joint_msg->velocities[joint_num_] = (10 * joint_vel_cmd_) * (joy_msg->axes[LEFT_TRIGGER]);
-            joint_pub_->publish(std::move(joint_msg));
+            joint_msg_.velocities[joint_num_] = (10 * joint_vel_cmd_) * (joy_msg->axes[LEFT_TRIGGER]);
+            joint_pub_->publish(joint_msg_);
         }
 
 
