@@ -5,10 +5,12 @@
 #include <sensor_msgs/msg/joy_feedback.hpp>
 #include <control_msgs/msg/joint_jog.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
 #include <moveit_msgs/srv/servo_command_type.hpp>
 
-const std::string TWIST_TOPIC = "/servo_node/delta_twist_cmds";
 const std::string JOINT_TOPIC = "/servo_node/delta_joint_cmds";
+const std::string TWIST_TOPIC = "/servo_node/delta_twist_cmds";
+const std::string POSE_TOPIC = "/servo_node/pose_target_cmds";
 const std::string JOY_TOPIC   = "/joy";
 const std::string JOY_FB_TOPIC  = "/joy/set_feedback";
 const std::string PLANNING_FRAME_ID = "arm_Link";
@@ -57,8 +59,9 @@ class GameController
     private:
         rclcpp::Node::SharedPtr service_node_;
 
-        rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr twist_pub_;
         rclcpp::Publisher<control_msgs::msg::JointJog>::SharedPtr joint_pub_;
+        rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr twist_pub_;
+        rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub_;
         
         rclcpp::Publisher<sensor_msgs::msg::JoyFeedback>::SharedPtr joy_fb_pub_;
         rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
@@ -67,6 +70,7 @@ class GameController
         std::shared_ptr<moveit_msgs::srv::ServoCommandType::Request> servo_command_type_;
         double joint_vel_cmd_;       // rad/s
         double cartesian_step_size_; // meters
+        double pose_step_size_;
         std::string command_frame_id_;
 
         bool enabled_;
@@ -93,6 +97,7 @@ class GameController
 GameController::GameController() : 
     joint_vel_cmd_(0.1), 
     cartesian_step_size_(0.1),
+    pose_step_size_(0.01),
     command_frame_id_{"arm_Link"},
     enabled_(false),
     enable_cmd_toggle_(true),
@@ -110,6 +115,7 @@ GameController::GameController() :
     // JointJog and CartesianJog topic publishers
     joint_pub_ = nh_->create_publisher<control_msgs::msg::JointJog>(JOINT_TOPIC, ROS_QUEUE_SIZE);
     twist_pub_ = nh_->create_publisher<geometry_msgs::msg::TwistStamped>(TWIST_TOPIC, ROS_QUEUE_SIZE);
+    pose_pub_  = nh_->create_publisher<geometry_msgs::msg::PoseStamped>(POSE_TOPIC, ROS_QUEUE_SIZE);
 
     // Joy feedback publisher
     joy_fb_pub_ = service_node_->create_publisher<sensor_msgs::msg::JoyFeedback>(JOY_FB_TOPIC, ROS_QUEUE_SIZE);
@@ -185,6 +191,15 @@ void GameController::joy_cb_(const sensor_msgs::msg::Joy::SharedPtr joy_msg)
             RCLCPP_INFO(service_node_->get_logger(), "Servo command type switch to CartesianJog");
         }
         else if (servo_command_type_->command_type == moveit_msgs::srv::ServoCommandType::Request::TWIST)
+        {
+            servo_command_type_->command_type = moveit_msgs::srv::ServoCommandType::Request::POSE;
+            auto future = servo_cmd_type_cli_->async_send_request(servo_command_type_);
+
+            // rclcpp::spin_until_future_complete(service_node_, future);
+
+            RCLCPP_INFO(service_node_->get_logger(), "Servo command type switch to Pose mode");
+        }
+        else if (servo_command_type_->command_type == moveit_msgs::srv::ServoCommandType::Request::POSE)
         {
             servo_command_type_->command_type = moveit_msgs::srv::ServoCommandType::Request::JOINT_JOG;
             auto future = servo_cmd_type_cli_->async_send_request(servo_command_type_);
@@ -357,8 +372,22 @@ void GameController::joy_cb_(const sensor_msgs::msg::Joy::SharedPtr joy_msg)
     else if (servo_command_type_->command_type == moveit_msgs::srv::ServoCommandType::Request::TWIST)
     {
         auto twist_msg = std::make_unique<geometry_msgs::msg::TwistStamped>();
-        twist_msg->header.frame_id = command_frame_id_;
+        twist_msg->header.frame_id = "j1_Link";
         twist_msg->header.stamp = nh_->now();
+
+        // RIGHT/LEFT TRIGGER(s) used to jog joint at variable speed
+        if (joy_msg->axes[RIGHT_TRIGGER])
+        {
+            twist_msg->twist.angular.y = (1.0 * joy_msg->axes[RIGHT_TRIGGER]);
+            twist_pub_->publish(std::move(twist_msg));
+
+        }
+        else if (joy_msg->axes[LEFT_TRIGGER])
+        {
+            twist_msg->twist.angular.y = -(1.0 * joy_msg->axes[LEFT_TRIGGER]);
+            twist_pub_->publish(std::move(twist_msg));
+        }
+
 
         // if (joy_msg->axes[RIGHT_STICK_X])
         // {
@@ -382,13 +411,13 @@ void GameController::joy_cb_(const sensor_msgs::msg::Joy::SharedPtr joy_msg)
         // RIGHT/LEFT BUMPER used to move up/down Z
         if (joy_msg->buttons[RIGHT_BUMPER] == PRESSED)
         {
-            twist_msg->twist.linear.z = cartesian_step_size_;
+            twist_msg->twist.linear.x = cartesian_step_size_;
             twist_pub_->publish(std::move(twist_msg));
             return;
         }
         if (joy_msg->buttons[LEFT_BUMPER] == PRESSED)
         {
-            twist_msg->twist.linear.z = -cartesian_step_size_;
+            twist_msg->twist.linear.x = -cartesian_step_size_;
             twist_pub_->publish(std::move(twist_msg));
             return;
         }
@@ -410,12 +439,31 @@ void GameController::joy_cb_(const sensor_msgs::msg::Joy::SharedPtr joy_msg)
         // LEFT STICK used to move end effector in xy plane
         if (joy_msg->axes[LEFT_STICK_X] || joy_msg->axes[LEFT_STICK_Y])
         {
-            twist_msg->twist.linear.x = cartesian_step_size_ * joy_msg->axes[LEFT_STICK_X];
-            twist_msg->twist.linear.y = cartesian_step_size_ * joy_msg->axes[LEFT_STICK_Y];
+            twist_msg->twist.linear.y = cartesian_step_size_ * joy_msg->axes[LEFT_STICK_X];
+            twist_msg->twist.linear.z = -cartesian_step_size_ * joy_msg->axes[LEFT_STICK_Y];
             twist_pub_->publish(std::move(twist_msg));
             return;
         }
 
+    }
+    else if (servo_command_type_->command_type == moveit_msgs::srv::ServoCommandType::Request::POSE)
+    {
+        auto pose_msg = std::make_unique<geometry_msgs::msg::PoseStamped>();
+        pose_msg->header.frame_id = "j1_Link";
+        pose_msg->header.stamp = nh_->now();
+
+        // geometry_msgs::msg::PoseStamped pose_msg;
+        // pose_msg.header.frame_id = "j6_Link";
+        // pose_msg.header.stamp = nh_->now();
+
+        if (joy_msg->axes[LEFT_STICK_X] || joy_msg->axes[LEFT_STICK_Y])
+        {
+            pose_msg->pose.position.y = pose_step_size_ * joy_msg->axes[LEFT_STICK_X];
+            pose_msg->pose.position.z = -pose_step_size_ * joy_msg->axes[LEFT_STICK_Y];
+            pose_pub_->publish(std::move(pose_msg));
+
+            return;
+        }
     }
 
 }
