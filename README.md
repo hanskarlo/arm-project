@@ -5,17 +5,11 @@
 ## About
 This repository hosts the software for ROS2 integration with a 6 DoF 5kg ZeroErr arm for leveraging MoveIt2 features such as motion/trajectory planning, kinematic control, collision checking, and 3D perception.
 
-The software was tested on an ASUS PN50 with
-- Ryzen 5 4500U, 16GB Ram
-- Realtek Semiconductor RTL8111/8168/8411 Gigabit Ethernet Controller
-- Linux kernel 6.6.18 with PREEMPT_RT patch (6.6.18-rt23)
-
 <br>
 
 ## Built with
 [<img src="https://automaticaddison.com/wp-content/uploads/2023/10/ros2-iron.png" alt="ROS2 Iron Logo" width="240"/>](https://docs.ros.org/en/iron/Releases/Release-Iron-Irwini.html)
 [<img src="https://images.squarespace-cdn.com/content/v1/606d378755a86f589aa297b7/1717136168404-CV7O6LD1M56PNET8G161/JazzyJalisco_Final.png" alt="ROS2 Jazzy Logo" width="264"/>](https://docs.ros.org/en/jazzy/index.html)
-
 
 [<img src="https://moveit.ros.org/assets/logo/moveit_logo-black.png" alt="MoveIt Logo" width="200"/>](https://github.com/ros-planning/moveit2)
 
@@ -31,9 +25,9 @@ The software was tested on an ASUS PN50 with
 * PC with Ethernet hardware
 * Ubuntu 22.04 (Jammy Jellyfish) and ROS2 Iron
   * Or Ubuntu 24 (Noble) and ROS2 Jazzy
-* MoveIt2 Humble or MoveIt2 Iron
-* IgH EtherCAT Master for Linux
-  * Compilation with Xenomai 3 kernel highly recommended
+* MoveIt2 Iron or Jazzy
+* IgH EtherCAT Master for Linux (stable 1.6)
+  * Use with Xenomai 3 highly recommended
 * cereal - A C++11 library for serialization
 
 <br>
@@ -48,7 +42,6 @@ sudo apt install ros-<your ros distro>-ros2-control
 sudo apt install ros-<your ros distro>-ros2-controllers
 ```
 
-<br>
 
 #### cereal
 
@@ -61,7 +54,6 @@ Download **cereal** and place `cereal-1.3.2/include/cereal` into a folder where 
 sudo cp -r ~/Downloads/cereal-1.3.2/include/cereal /usr/include/
 ```
 
-<br>
 
 #### Extra MoveIt2 Packages
 
@@ -75,7 +67,6 @@ sudo apt install ros-$ROS_DISTRO-moveit-visual-tools
 sudo apt install ros-$ROS_DISTRO-pick-ik
 ```
 
-<br>
 
 #### EtherCAT Kernel Module
 
